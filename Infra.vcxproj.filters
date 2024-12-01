@@ -39,12 +39,18 @@
     <ClInclude Include="Include\Infra\Internal\ApiWindows.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Include\Infra\Strings.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\TemporaryBuffer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Source\Globals.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Strings.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

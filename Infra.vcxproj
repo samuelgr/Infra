@@ -25,11 +25,13 @@
     <ClInclude Include="Include\Infra\Internal\ApiWindows.h" />
     <ClInclude Include="Include\Infra\Iterator.h" />
     <ClInclude Include="Include\Infra\MutexWrapper.h" />
+    <ClInclude Include="Include\Infra\Strings.h" />
     <ClInclude Include="Include\Infra\TemporaryBuffer.h" />
     <ClInclude Include="Include\Infra\ValueOrError.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Globals.cpp" />
+    <ClCompile Include="Source\Strings.cpp" />
     <ClCompile Include="Source\TemporaryBuffer.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
