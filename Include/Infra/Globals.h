@@ -83,5 +83,32 @@ namespace Infra
     /// Retrieves and returns version information for this running binary.
     /// @return Version information structure.
     SVersionInfo GetVersion(void);
+
+    /// Obtains the complete filename for the running executable.
+    /// @return Complete filename of the running executable.
+    std::wstring_view GetExecutableCompleteFilename(void);
+
+    /// Obtains the base name for the running executable, which is the file name part of the path,
+    /// after the last backslash.
+    /// @return Base name of the running executable.
+    std::wstring_view GetExecutableBaseName(void);
+
+    /// Obtains the directory in which the running executable is located.
+    /// @return Directory name of the running executable.
+    std::wstring_view GetExecutableDirectoryName(void);
+
+    /// Obtains the complete filename for the specific binary module that contains this code.
+    /// @return Complete filename of the module that contains this code.
+    std::wstring_view GetThisModuleCompleteFilename(void);
+
+    /// Obtains the base name for the specific binary module that contains this code, which is the
+    /// file name part of the path, after the last backslash.
+    /// @return Base name of the module that contains this code.
+    std::wstring_view GetThisModuleBaseName(void);
+
+    /// Obtains the directory in which the specific binary module that contains this code is
+    /// located.
+    /// @return Directory name of the module that contains this code.
+    std::wstring_view GetThisModuleDirectoryName(void);
   } // namespace Globals
 } // namespace Infra
