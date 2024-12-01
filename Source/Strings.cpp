@@ -6,7 +6,7 @@
  * Copyright (c) 2016-2024
  ***********************************************************************************************//**
  * @file Strings.cpp
- *   Implementation of functions for manipulating Pathwinder-specific strings.
+ *   Implementation of functions for manipulating strings.
  **************************************************************************************************/
 
 #include "Strings.h"
