@@ -18,6 +18,20 @@
       <Platform>x64</Platform>
     </ProjectConfiguration>
   </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Include\Infra\ArrayList.h" />
+    <ClInclude Include="Include\Infra\DebugAssert.h" />
+    <ClInclude Include="Include\Infra\Globals.h" />
+    <ClInclude Include="Include\Infra\Internal\ApiWindows.h" />
+    <ClInclude Include="Include\Infra\Iterator.h" />
+    <ClInclude Include="Include\Infra\MutexWrapper.h" />
+    <ClInclude Include="Include\Infra\TemporaryBuffer.h" />
+    <ClInclude Include="Include\Infra\ValueOrError.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="Source\Globals.cpp" />
+    <ClCompile Include="Source\TemporaryBuffer.cpp" />
+  </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
