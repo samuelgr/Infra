@@ -16,6 +16,7 @@
 #include <cstdarg>
 #include <cstdio>
 #include <mutex>
+#include <optional>
 #include <string>
 
 #include "Globals.h"
@@ -328,10 +329,7 @@ namespace Infra
       OutputInternal(severity, messageBuf.Data());
     }
 
-    void CreateAndEnableLogFile(
-        std::wstring_view logFilename,
-        std::wstring_view productName,
-        std::optional<Globals::SVersionInfo> productVersion)
+    void CreateAndEnableLogFile(std::wstring_view logFilename)
     {
       if (false == IsLogFileEnabled())
       {
@@ -347,29 +345,43 @@ namespace Infra
         static constexpr wchar_t kLogHeaderSeparator[] =
             L"---------------------------------------------";
         fwprintf_s(logFileHandle, L"%s\n", kLogHeaderSeparator);
+
+        const std::wstring_view productName =
+            Globals::GetProductName().value_or(Globals::GetExecutableBaseName());
         fwprintf_s(
             logFileHandle,
             L"%.*s Log\n",
             static_cast<int>(productName.length()),
             productName.data());
         fwprintf_s(logFileHandle, L"%s\n", kLogHeaderSeparator);
-        if (productVersion.has_value())
+
+        const std::optional<Globals::SVersionInfo> maybeProductVersion =
+            Globals::GetProductVersion();
+        if (maybeProductVersion.has_value())
+        {
+          const std::wstring_view productVersion = maybeProductVersion->string;
           fwprintf_s(
               logFileHandle,
-              L"Version:       %.*s\n",
-              static_cast<int>(productVersion->string.length()),
-              productVersion->string.data());
-        fwprintf_s(logFileHandle, L"PID:           %d\n", Globals::GetCurrentProcessId());
+              L"Product Version:  %.*s\n",
+              static_cast<int>(productVersion.length()),
+              productVersion.data());
+        }
         fwprintf_s(
             logFileHandle,
-            L"Module:        %.*s\n",
-            static_cast<int>(Globals::GetThisModuleCompleteFilename().length()),
-            Globals::GetThisModuleCompleteFilename().data());
+            L"Infra Version:    %.*s\n",
+            static_cast<int>(Globals::GetInfraVersion().string.length()),
+            Globals::GetInfraVersion().string.data());
+        fwprintf_s(logFileHandle, L"Process ID:       %d\n", Globals::GetCurrentProcessId());
         fwprintf_s(
             logFileHandle,
-            L"Executable:    %.*s\n",
+            L"Executable:       %.*s\n",
             static_cast<int>(Globals::GetExecutableCompleteFilename().length()),
             Globals::GetExecutableCompleteFilename().data());
+        fwprintf_s(
+            logFileHandle,
+            L"Module:           %.*s\n",
+            static_cast<int>(Globals::GetThisModuleCompleteFilename().length()),
+            Globals::GetThisModuleCompleteFilename().data());
         fwprintf_s(logFileHandle, L"%s\n", kLogHeaderSeparator);
         fflush(logFileHandle);
       }

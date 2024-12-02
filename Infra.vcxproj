@@ -30,7 +30,6 @@
     <ClInclude Include="Include\Infra\Strings.h" />
     <ClInclude Include="Include\Infra\TemporaryBuffer.h" />
     <ClInclude Include="Include\Infra\ValueOrError.h" />
-    <ClInclude Include="Resources\Infra.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Configuration.cpp" />
@@ -38,9 +37,6 @@
     <ClCompile Include="Source\Message.cpp" />
     <ClCompile Include="Source\Strings.cpp" />
     <ClCompile Include="Source\TemporaryBuffer.cpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <ResourceCompile Include="Resources\Infra.rc" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>

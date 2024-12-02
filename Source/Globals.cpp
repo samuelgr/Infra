@@ -15,6 +15,7 @@
 #include <cstdint>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <string_view>
 
@@ -26,6 +27,12 @@ namespace Infra
 {
   namespace Globals
   {
+    /// Name of the product represented by the running binary that contains this code.
+    static std::optional<std::wstring_view> productName;
+
+    /// Version of the product represented by the running binary that contains this code.
+    static std::optional<SVersionInfo> productVersion;
+
     HANDLE GetCurrentProcessHandle(void)
     {
       static HANDLE currentProcessHandle = GetCurrentProcess();
@@ -71,17 +78,19 @@ namespace Infra
       return systemInformation;
     }
 
-    SVersionInfo GetVersion(void)
+    SVersionInfo GetInfraVersion(void)
     {
-      constexpr uint16_t kVersionStructured[] = {GIT_VERSION_STRUCT};
-      static_assert(4 == _countof(kVersionStructured), "Invalid structured version information.");
+      return GitVersionInfoForCurrentProject();
+    }
 
-      return {
-          .major = kVersionStructured[0],
-          .minor = kVersionStructured[1],
-          .patch = kVersionStructured[2],
-          .flags = kVersionStructured[3],
-          .string = _CRT_WIDE(GIT_VERSION_STRING)};
+    std::optional<std::wstring_view> GetProductName(void)
+    {
+      return productName;
+    }
+
+    std::optional<SVersionInfo> GetProductVersion(void)
+    {
+      return productVersion;
     }
 
     std::wstring_view GetExecutableCompleteFilename(void)
@@ -201,6 +210,12 @@ namespace Infra
           });
 
       return thisModuleDirectoryName;
+    }
+
+    void SetProductInformation(std::wstring_view newProductName, SVersionInfo newProductVersion)
+    {
+      productName = newProductName;
+      productVersion = newProductVersion;
     }
   } // namespace Globals
 } // namespace Infra

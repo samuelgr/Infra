@@ -71,9 +71,6 @@
     <ClInclude Include="Include\Infra\ValueOrError.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Resources\Infra.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="Include\Infra\Test\Harness.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -89,10 +86,5 @@
     <ClInclude Include="Include\Infra\Message.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
-    <ResourceCompile Include="Resources\Infra.rc">
-      <Filter>Resource Files</Filter>
-    </ResourceCompile>
   </ItemGroup>
 </Project>

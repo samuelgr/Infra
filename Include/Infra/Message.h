@@ -83,10 +83,7 @@ namespace Infra
     /// automatically to the base name of the module containing this code.
     /// @param [in] productVersion Optional product version to be included in the log file header.
     /// Defaults to being omitted entirely.
-    void CreateAndEnableLogFile(
-        std::wstring_view logFilename,
-        std::wstring_view productName = Globals::GetThisModuleBaseName(),
-        std::optional<Globals::SVersionInfo> productVersion = std::nullopt);
+    void CreateAndEnableLogFile(std::wstring_view logFilename);
 
     /// Checks if logging to a file is enabled.
     /// @return `true` if so, `false` if not.
