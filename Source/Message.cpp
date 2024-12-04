@@ -19,12 +19,11 @@
 #include <optional>
 #include <string>
 
+#include "ApiWindows.h"
 #include "Globals.h"
 #include "MutexWrapper.h"
 #include "Strings.h"
 #include "TemporaryBuffer.h"
-
-#include "Internal/ApiWindows.h"
 
 namespace Infra
 {

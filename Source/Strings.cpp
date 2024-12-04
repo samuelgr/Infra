@@ -19,11 +19,10 @@
 #include <string>
 #include <string_view>
 
+#include "ApiWindows.h"
 #include "DebugAssert.h"
 #include "Globals.h"
 #include "TemporaryBuffer.h"
-
-#include "Internal/ApiWindows.h"
 
 namespace Infra
 {

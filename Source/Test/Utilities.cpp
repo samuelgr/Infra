@@ -14,7 +14,7 @@
 #include <cstdarg>
 #include <cstdio>
 
-#include "Internal/ApiWindows.h"
+#include "ApiWindows.h"
 
 namespace Infra
 {
