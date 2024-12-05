@@ -15,7 +15,7 @@
 
 #include <optional>
 
-#include "Globals.h"
+#include "ProcessInfo.h"
 
 namespace Infra
 {

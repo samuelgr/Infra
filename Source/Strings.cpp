@@ -21,7 +21,7 @@
 
 #include "ApiWindows.h"
 #include "DebugAssert.h"
-#include "Globals.h"
+#include "ProcessInfo.h"
 #include "TemporaryBuffer.h"
 
 namespace Infra

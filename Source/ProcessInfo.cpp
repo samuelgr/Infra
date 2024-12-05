@@ -5,12 +5,11 @@
  * Authored by Samuel Grossman
  * Copyright (c) 2016-2024
  ***********************************************************************************************//**
- * @file Globals.cpp
- *   Implementation of accessors and mutators for global data items.
- *   Intended for miscellaneous data elements with no other suitable place.
+ * @file ProcessInfo.cpp
+ *   Implementation of functionality related to getting information about the running process.
  **************************************************************************************************/
 
-#include "Globals.h"
+#include "ProcessInfo.h"
 
 #include <cstdint>
 #include <memory>
@@ -24,10 +23,10 @@
 
 namespace Infra
 {
-  namespace Globals
+  namespace ProcessInfo
   {
     /// Name of the product represented by the running binary that contains this code.
-    static std::optional<std::wstring_view> productName;
+    static std::optional<std::wstring> productName;
 
     /// Version of the product represented by the running binary that contains this code.
     static std::optional<SVersionInfo> productVersion;
@@ -44,7 +43,7 @@ namespace Infra
       return currentProcessId;
     }
 
-    HINSTANCE GetInstanceHandle(void)
+    HINSTANCE GetThisModuleInstanceHandle(void)
     {
       static HINSTANCE instanceHandle;
       static std::once_flag initFlag;
@@ -55,7 +54,7 @@ namespace Infra
           {
             GetModuleHandleEx(
                 GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS,
-                reinterpret_cast<LPCWSTR>(&GetInstanceHandle),
+                reinterpret_cast<LPCWSTR>(&GetThisModuleInstanceHandle),
                 &instanceHandle);
           });
 
@@ -162,7 +161,7 @@ namespace Infra
           {
             TemporaryBuffer<wchar_t> buf;
             GetModuleFileName(
-                Globals::GetInstanceHandle(), buf.Data(), static_cast<DWORD>(buf.Capacity()));
+                GetThisModuleInstanceHandle(), buf.Data(), static_cast<DWORD>(buf.Capacity()));
 
             thisModuleCompleteFilename.assign(buf.Data());
           });
@@ -216,5 +215,21 @@ namespace Infra
       productName = newProductName;
       productVersion = newProductVersion;
     }
-  } // namespace Globals
+
+    void SetProductInformation(
+        HINSTANCE newProductNameResourceModuleHandle,
+        UINT newProductNameResourceId,
+        SVersionInfo newProductVersion)
+    {
+      const wchar_t* stringStart = nullptr;
+      int stringLength = LoadString(
+          newProductNameResourceModuleHandle, newProductNameResourceId, (wchar_t*)&stringStart, 0);
+
+      while ((stringLength > 0) && (L'\0' == stringStart[stringLength - 1]))
+        stringLength -= 1;
+
+      SetProductInformation(
+          std::wstring_view(stringStart, static_cast<size_t>(stringLength)), newProductVersion);
+    }
+  } // namespace ProcessInfo
 } // namespace Infra

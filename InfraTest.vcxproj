@@ -105,8 +105,8 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Source\Configuration.cpp" />
-    <ClCompile Include="Source\Globals.cpp" />
     <ClCompile Include="Source\Message.cpp" />
+    <ClCompile Include="Source\ProcessInfo.cpp" />
     <ClCompile Include="Source\Strings.cpp" />
     <ClCompile Include="Source\TemporaryBuffer.cpp" />
     <ClCompile Include="Source\Test\Case\StringsTest.cpp" />
@@ -118,11 +118,11 @@
     <ClInclude Include="Include\Infra\ArrayList.h" />
     <ClInclude Include="Include\Infra\Configuration.h" />
     <ClInclude Include="Include\Infra\DebugAssert.h" />
-    <ClInclude Include="Include\Infra\Globals.h" />
     <ClInclude Include="Include\Infra\Internal\ApiWindows.h" />
     <ClInclude Include="Include\Infra\Iterator.h" />
     <ClInclude Include="Include\Infra\Message.h" />
     <ClInclude Include="Include\Infra\Mutex.h" />
+    <ClInclude Include="Include\Infra\ProcessInfo.h" />
     <ClInclude Include="Include\Infra\Strings.h" />
     <ClInclude Include="Include\Infra\TemporaryBuffer.h" />
     <ClInclude Include="Include\Infra\Test\Harness.h" />

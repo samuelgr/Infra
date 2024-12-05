@@ -20,8 +20,8 @@
 #include <string>
 
 #include "ApiWindows.h"
-#include "Globals.h"
 #include "Mutex.h"
+#include "ProcessInfo.h"
 #include "Strings.h"
 #include "TemporaryBuffer.h"
 
@@ -164,8 +164,8 @@ namespace Infra
       fwprintf_s(
           stderr,
           L"%.*s:[%c] %s\n",
-          static_cast<int>(Globals::GetThisModuleBaseName().length()),
-          Globals::GetThisModuleBaseName().data(),
+          static_cast<int>(ProcessInfo::GetThisModuleBaseName().length()),
+          ProcessInfo::GetThisModuleBaseName().data(),
           CharacterForSeverity(severity),
           message);
     }
@@ -178,8 +178,8 @@ namespace Infra
     {
       OutputDebugString(Strings::Format(
                             L"%.*s:[%c] %s\n",
-                            static_cast<int>(Globals::GetThisModuleBaseName().length()),
-                            Globals::GetThisModuleBaseName().data(),
+                            static_cast<int>(ProcessInfo::GetThisModuleBaseName().length()),
+                            ProcessInfo::GetThisModuleBaseName().data(),
                             CharacterForSeverity(severity),
                             message)
                             .AsCString());
@@ -262,7 +262,7 @@ namespace Infra
           break;
       }
 
-      MessageBox(nullptr, message, Globals::GetThisModuleBaseName().data(), messageBoxType);
+      MessageBox(nullptr, message, ProcessInfo::GetThisModuleBaseName().data(), messageBoxType);
     }
 
     /// Outputs the specified message.
@@ -346,7 +346,7 @@ namespace Infra
         fwprintf_s(logFileHandle, L"%s\n", kLogHeaderSeparator);
 
         const std::wstring_view productName =
-            Globals::GetProductName().value_or(Globals::GetExecutableBaseName());
+            ProcessInfo::GetProductName().value_or(ProcessInfo::GetExecutableBaseName());
         fwprintf_s(
             logFileHandle,
             L"%.*s Log\n",
@@ -354,8 +354,8 @@ namespace Infra
             productName.data());
         fwprintf_s(logFileHandle, L"%s\n", kLogHeaderSeparator);
 
-        const std::optional<Globals::SVersionInfo> maybeProductVersion =
-            Globals::GetProductVersion();
+        const std::optional<ProcessInfo::SVersionInfo> maybeProductVersion =
+            ProcessInfo::GetProductVersion();
         if (maybeProductVersion.has_value())
         {
           const std::wstring_view productVersion = maybeProductVersion->string;
@@ -368,19 +368,19 @@ namespace Infra
         fwprintf_s(
             logFileHandle,
             L"Infra Version:    %.*s\n",
-            static_cast<int>(Globals::GetInfraVersion().string.length()),
-            Globals::GetInfraVersion().string.data());
-        fwprintf_s(logFileHandle, L"Process ID:       %d\n", Globals::GetCurrentProcessId());
+            static_cast<int>(ProcessInfo::GetInfraVersion().string.length()),
+            ProcessInfo::GetInfraVersion().string.data());
+        fwprintf_s(logFileHandle, L"Process ID:       %d\n", ProcessInfo::GetCurrentProcessId());
         fwprintf_s(
             logFileHandle,
             L"Executable:       %.*s\n",
-            static_cast<int>(Globals::GetExecutableCompleteFilename().length()),
-            Globals::GetExecutableCompleteFilename().data());
+            static_cast<int>(ProcessInfo::GetExecutableCompleteFilename().length()),
+            ProcessInfo::GetExecutableCompleteFilename().data());
         fwprintf_s(
             logFileHandle,
             L"Module:           %.*s\n",
-            static_cast<int>(Globals::GetThisModuleCompleteFilename().length()),
-            Globals::GetThisModuleCompleteFilename().data());
+            static_cast<int>(ProcessInfo::GetThisModuleCompleteFilename().length()),
+            ProcessInfo::GetThisModuleCompleteFilename().data());
         fwprintf_s(logFileHandle, L"%s\n", kLogHeaderSeparator);
         fflush(logFileHandle);
       }
