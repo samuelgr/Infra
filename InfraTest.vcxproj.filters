@@ -59,7 +59,7 @@
     <ClInclude Include="Include\Infra\Iterator.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Include\Infra\MutexWrapper.h">
+    <ClInclude Include="Include\Infra\Mutex.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Include\Infra\Strings.h">

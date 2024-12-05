@@ -21,7 +21,7 @@
 
 #include "ApiWindows.h"
 #include "Globals.h"
-#include "MutexWrapper.h"
+#include "Mutex.h"
 #include "Strings.h"
 #include "TemporaryBuffer.h"
 

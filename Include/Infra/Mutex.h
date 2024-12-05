@@ -5,7 +5,7 @@
  * Authored by Samuel Grossman
  * Copyright (c) 2016-2024
  ***********************************************************************************************//**
- * @file MutexWrapper.h
+ * @file Mutex.h
  *   Declaration and implementation of simple wrappers around standard concurrency control
  *   mechanisms for higher performance on Windows.
  **************************************************************************************************/
@@ -31,7 +31,6 @@ namespace Infra
   {
   public:
 
-    /// Native handle type definition.
     using native_handle_type = std::shared_mutex::native_handle_type;
 
   public:
@@ -42,25 +41,21 @@ namespace Infra
 
     ~Mutex(void) = default;
 
-    /// Locks this mutex.
     inline void lock(void)
     {
       mutexObject.lock();
     }
 
-    /// Attempts to lock this mutex without blocking.
     inline bool try_lock(void)
     {
       return mutexObject.try_lock();
     }
 
-    /// Unlocks this mutex.
     inline void unlock(void)
     {
       mutexObject.unlock();
     }
 
-    /// Retrieves the native handle for this mutex.
     inline native_handle_type native_handle(void)
     {
       return mutexObject.native_handle();
@@ -68,7 +63,6 @@ namespace Infra
 
   private:
 
-    /// Wrapped mutex object.
     std::shared_mutex mutexObject;
   };
 
@@ -80,7 +74,6 @@ namespace Infra
   {
   public:
 
-    /// Native handle type definition.
     using native_handle_type = void*;
 
   public:
@@ -103,25 +96,21 @@ namespace Infra
       DeleteCriticalSection(&criticalSectionObject);
     }
 
-    /// Locks this mutex.
     inline void lock(void)
     {
       EnterCriticalSection(&criticalSectionObject);
     }
 
-    /// Attempts to lock this mutex without blocking.
     inline bool try_lock(void)
     {
       return (0 != TryEnterCriticalSection(&criticalSectionObject));
     }
 
-    /// Unlocks this mutex.
     inline void unlock(void)
     {
       LeaveCriticalSection(&criticalSectionObject);
     }
 
-    /// Retrieves the native handle for this mutex.
     inline native_handle_type native_handle(void)
     {
       return &criticalSectionObject;
@@ -129,13 +118,12 @@ namespace Infra
 
   private:
 
-    /// Wrapped CRITICAL_SECTION object.
     CRITICAL_SECTION criticalSectionObject;
   };
 
-  /// Shared mutex, also known as a reader/writer mutex. The existing Windows implementation uses
-  /// SRWLock, which is as modern and performant as it gets, so no wrapping is necessary. For more
-  /// information on performance, see
+  /// Shared mutex, also known as a reader/writer mutex. The existing Windows implementation of
+  /// std::shared_mutex uses SRWLock, which is as modern and performant as it gets, so no wrapping
+  /// is necessary. For more information on performance, see
   /// https://stackoverflow.com/questions/69990339/why-is-stdmutex-so-much-worse-than-stdshared-mutex-in-visual-c
   using SharedMutex = std::shared_mutex;
 } // namespace Infra

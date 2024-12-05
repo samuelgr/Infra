@@ -26,7 +26,7 @@
     <ClInclude Include="Include\Infra\Internal\ApiWindows.h" />
     <ClInclude Include="Include\Infra\Iterator.h" />
     <ClInclude Include="Include\Infra\Message.h" />
-    <ClInclude Include="Include\Infra\MutexWrapper.h" />
+    <ClInclude Include="Include\Infra\Mutex.h" />
     <ClInclude Include="Include\Infra\Strings.h" />
     <ClInclude Include="Include\Infra\TemporaryBuffer.h" />
     <ClInclude Include="Include\Infra\ValueOrError.h" />

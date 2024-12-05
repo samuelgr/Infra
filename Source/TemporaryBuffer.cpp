@@ -15,7 +15,7 @@
 #include <cstdlib>
 #include <mutex>
 
-#include "MutexWrapper.h"
+#include "Mutex.h"
 
 namespace Infra
 {
