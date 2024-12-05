@@ -19,8 +19,8 @@
 #include <optional>
 #include <string_view>
 
-#include "Core/TemporaryBuffer.h"
-#include "Internal/ApiWindows.h"
+#include "ApiWindows.h"
+#include "TemporaryBuffer.h"
 
 namespace Infra
 {

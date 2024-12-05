@@ -15,7 +15,7 @@
 #include <string>
 #include <string_view>
 
-#include "Internal/ApiWindows.h"
+#include "ApiWindows.h"
 
 namespace Infra
 {

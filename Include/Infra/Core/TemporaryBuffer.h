@@ -20,8 +20,8 @@
 #include <type_traits>
 #include <utility>
 
-#include "Core/DebugAssert.h"
-#include "Core/Iterator.h"
+#include "DebugAssert.h"
+#include "Iterator.h"
 
 namespace Infra
 {
