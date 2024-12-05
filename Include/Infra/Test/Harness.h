@@ -15,7 +15,7 @@
 #include <string>
 #include <string_view>
 
-#include "Test/TestCase.h"
+#include "TestCase.h"
 
 namespace Infra
 {

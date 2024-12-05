@@ -13,7 +13,7 @@
 
 #include <string_view>
 
-#include "Test/Utilities.h"
+#include "Utilities.h"
 
 /// Print a message during a test.
 #define TEST_PRINT_MESSAGE(messagef, ...)                                                          \
