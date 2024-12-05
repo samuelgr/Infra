@@ -9,7 +9,7 @@
  *   Implementation of configuration file functionality.
  **************************************************************************************************/
 
-#include "Configuration.h"
+#include "Core/Configuration.h"
 
 #include <algorithm>
 #include <climits>
@@ -23,8 +23,8 @@
 #include <string_view>
 #include <vector>
 
-#include "Strings.h"
-#include "TemporaryBuffer.h"
+#include "Core/Strings.h"
+#include "Core/TemporaryBuffer.h"
 
 namespace Infra
 {

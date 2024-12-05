@@ -9,13 +9,12 @@
  *   Unit tests for functions that manipulate strings.
  **************************************************************************************************/
 
-#include "TestCase.h"
-
-#include "Strings.h"
+#include "Core/Strings.h"
 
 #include <string_view>
 
-#include "TemporaryBuffer.h"
+#include "Core/TemporaryBuffer.h"
+#include "Test/TestCase.h"
 
 namespace Infra
 {

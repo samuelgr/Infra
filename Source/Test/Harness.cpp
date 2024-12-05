@@ -6,19 +6,18 @@
  * Copyright (c) 2016-2024
  ***********************************************************************************************//**
  * @file Harness.cpp
- *   Implementation of the test harness, including program entry point.
+ *   Implementation of the test harness, which runs test cases and collects results.
  **************************************************************************************************/
 
-#include "TestCase.h"
-
-#include "Harness.h"
+#include "Test/Harness.h"
 
 #include <map>
 #include <set>
 #include <string_view>
 
-#include "DebugAssert.h"
-#include "Utilities.h"
+#include "Core/DebugAssert.h"
+#include "Test/TestCase.h"
+#include "Test/Utilities.h"
 
 namespace Infra
 {
@@ -166,10 +165,3 @@ namespace Infra
     }
   } // namespace Test
 } // namespace Infra
-
-/// Test program entry point.
-/// @return Number of failing tests (0 means all tests passed).
-int wmain(int argc, const wchar_t* argv[])
-{
-  return ::Infra::Test::Harness::RunTestsWithMatchingPrefix(((argc > 1) ? argv[1] : L""));
-}

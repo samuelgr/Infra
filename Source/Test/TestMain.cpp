@@ -5,23 +5,13 @@
  * Authored by Samuel Grossman
  * Copyright (c) 2016-2024
  ***********************************************************************************************//**
- * @file TestCase.cpp
- *   Implementation of the test case interface.
+ * @file TestMain.cpp
+ *   Entry point for the test executable.
  **************************************************************************************************/
-
-#include "Test/TestCase.h"
-
-#include <string_view>
 
 #include "Test/Harness.h"
 
-namespace Infra
+int wmain(int argc, const wchar_t* argv[])
 {
-  namespace Test
-  {
-    ITestCase::ITestCase(std::wstring_view name)
-    {
-      Harness::RegisterTestCase(this, name);
-    }
-  } // namespace Test
-} // namespace Infra
+  return Infra::Test::Harness::RunTestsWithMatchingPrefix(((argc > 1) ? argv[1] : L""));
+}

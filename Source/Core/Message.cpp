@@ -9,7 +9,7 @@
  *   Message output implementation.
  **************************************************************************************************/
 
-#include "Message.h"
+#include "Core/Message.h"
 
 #include <sal.h>
 
@@ -20,10 +20,11 @@
 #include <string>
 
 #include "ApiWindows.h"
-#include "Mutex.h"
-#include "ProcessInfo.h"
-#include "Strings.h"
-#include "TemporaryBuffer.h"
+
+#include "Core/Mutex.h"
+#include "Core/ProcessInfo.h"
+#include "Core/Strings.h"
+#include "Core/TemporaryBuffer.h"
 
 namespace Infra
 {

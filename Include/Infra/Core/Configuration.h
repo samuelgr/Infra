@@ -22,7 +22,7 @@
 #include <type_traits>
 #include <vector>
 
-#include "TemporaryBuffer.h"
+#include "Core/TemporaryBuffer.h"
 
 /// Convenience wrapper around initializer list syntax for defining a configuration file section in
 /// a layout object. Specify a section name followed by a series of setting name and value type

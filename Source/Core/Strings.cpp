@@ -9,7 +9,7 @@
  *   Implementation of functions for manipulating strings.
  **************************************************************************************************/
 
-#include "Strings.h"
+#include "Core/Strings.h"
 
 #include <cctype>
 #include <cstdint>
@@ -20,9 +20,10 @@
 #include <string_view>
 
 #include "ApiWindows.h"
-#include "DebugAssert.h"
-#include "ProcessInfo.h"
-#include "TemporaryBuffer.h"
+
+#include "Core/DebugAssert.h"
+#include "Core/ProcessInfo.h"
+#include "Core/TemporaryBuffer.h"
 
 namespace Infra
 {

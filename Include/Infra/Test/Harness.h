@@ -6,16 +6,16 @@
  * Copyright (c) 2016-2024
  ***********************************************************************************************//**
  * @file Harness.h
- *   Declaration of the test harness, including program entry point.
+ *   Declaration of the test harness, which runs test cases and collects results.
  **************************************************************************************************/
 
 #pragma once
 
-#include "TestCase.h"
-
 #include <map>
 #include <string>
 #include <string_view>
+
+#include "Test/TestCase.h"
 
 namespace Infra
 {

@@ -9,13 +9,13 @@
  *   Partial implementation of temporary buffer management functionality.
  **************************************************************************************************/
 
-#include "TemporaryBuffer.h"
+#include "Core/TemporaryBuffer.h"
 
 #include <cstdint>
 #include <cstdlib>
 #include <mutex>
 
-#include "Mutex.h"
+#include "Core/Mutex.h"
 
 namespace Infra
 {

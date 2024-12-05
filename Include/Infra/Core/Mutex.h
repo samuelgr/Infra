@@ -14,7 +14,7 @@
 
 #include <shared_mutex>
 
-#include "ApiWindows.h"
+#include "Internal/ApiWindows.h"
 
 namespace Infra
 {

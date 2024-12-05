@@ -9,7 +9,7 @@
  *   Implementation of functionality related to getting information about the running process.
  **************************************************************************************************/
 
-#include "ProcessInfo.h"
+#include "Core/ProcessInfo.h"
 
 #include <cstdint>
 #include <memory>
@@ -19,7 +19,8 @@
 #include <string_view>
 
 #include "ApiWindows.h"
-#include "TemporaryBuffer.h"
+
+#include "Core/TemporaryBuffer.h"
 
 namespace Infra
 {
