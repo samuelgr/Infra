@@ -126,6 +126,18 @@ namespace Infra
     template bool EqualsCaseInsensitive<char>(std::string_view, std::string_view);
     template bool EqualsCaseInsensitive<wchar_t>(std::wstring_view, std::wstring_view);
 
+    template <typename CharType> bool EndsWithCaseInsensitive(
+        std::basic_string_view<CharType> str, std::basic_string_view<CharType> maybeSuffix)
+    {
+      if (str.length() < maybeSuffix.length()) return false;
+
+      str.remove_prefix(str.length() - maybeSuffix.length());
+      return EqualsCaseInsensitive(str, maybeSuffix);
+    }
+
+    template bool EndsWithCaseInsensitive<char>(std::string_view, std::string_view);
+    template bool EndsWithCaseInsensitive<wchar_t>(std::wstring_view, std::wstring_view);
+
     TemporaryString Format(_Printf_format_string_ const wchar_t* format, ...)
     {
       TemporaryString buf;
