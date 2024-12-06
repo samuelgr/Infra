@@ -13,6 +13,9 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="Visualization Files">
+      <UniqueIdentifier>{f9b0b5fe-24de-478b-b22a-c86af231e1fe}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Core\Configuration.cpp">
@@ -65,5 +68,22 @@
     <ClInclude Include="Include\Infra\Internal\ApiWindows.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Natvis Include="Natvis\ArrayList.natvis">
+      <Filter>Visualization Files</Filter>
+    </Natvis>
+    <Natvis Include="Natvis\Configuration.natvis">
+      <Filter>Visualization Files</Filter>
+    </Natvis>
+    <Natvis Include="Natvis\Iterator.natvis">
+      <Filter>Visualization Files</Filter>
+    </Natvis>
+    <Natvis Include="Natvis\TemporaryBuffer.natvis">
+      <Filter>Visualization Files</Filter>
+    </Natvis>
+    <Natvis Include="Natvis\ValueOrError.natvis">
+      <Filter>Visualization Files</Filter>
+    </Natvis>
   </ItemGroup>
 </Project>

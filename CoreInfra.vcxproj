@@ -38,6 +38,13 @@
     <ClInclude Include="Include\Infra\Core\ValueOrError.h" />
     <ClInclude Include="Include\Infra\Internal\ApiWindows.h" />
   </ItemGroup>
+  <ItemGroup>
+    <Natvis Include="Natvis\ArrayList.natvis" />
+    <Natvis Include="Natvis\Configuration.natvis" />
+    <Natvis Include="Natvis\Iterator.natvis" />
+    <Natvis Include="Natvis\TemporaryBuffer.natvis" />
+    <Natvis Include="Natvis\ValueOrError.natvis" />
+  </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
