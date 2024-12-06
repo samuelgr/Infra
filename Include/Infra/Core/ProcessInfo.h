@@ -17,6 +17,8 @@
 
 #include "ApiWindows.h"
 
+#include "GitVersionInfo.generated.h"
+
 namespace Infra
 {
   namespace ProcessInfo
