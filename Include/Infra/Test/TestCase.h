@@ -62,6 +62,10 @@
   public:                                                                                          \
                                                                                                    \
     inline TestCase_##name(void) : ::Infra::Test::ITestCase(_CRT_WIDE(#name)) {}                   \
+    static consteval std::wstring_view TestCaseName(void)                                          \
+    {                                                                                              \
+      return std::wstring_view(_CRT_WIDE(#name));                                                  \
+    }                                                                                              \
     bool CanRun(void) const override;                                                              \
     void Run(void) const override;                                                                 \
   };                                                                                               \
