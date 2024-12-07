@@ -122,7 +122,8 @@ namespace Infra
     /// @return Base name of the running executable.
     std::wstring_view GetExecutableBaseName(void);
 
-    /// Obtains the directory in which the running executable is located.
+    /// Obtains the directory in which the running executable is located, without a trailing
+    /// backslash.
     /// @return Directory name of the running executable.
     std::wstring_view GetExecutableDirectoryName(void);
 
@@ -136,7 +137,7 @@ namespace Infra
     std::wstring_view GetThisModuleBaseName(void);
 
     /// Obtains the directory in which the specific binary module that contains this code is
-    /// located.
+    /// located, without a trailing backslash.
     /// @return Directory name of the module that contains this code.
     std::wstring_view GetThisModuleDirectoryName(void);
 
