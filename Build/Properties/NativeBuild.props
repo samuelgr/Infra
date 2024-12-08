@@ -24,7 +24,7 @@
     <IntDir>$(TopLevelIntDir)</IntDir>
   </PropertyGroup>
 
-  <Import Project="$(MSBuildThisFileDirectory)GitVersionInfo.props" />
+  <Import Project="$(MSBuildThisFileDirectory)GitVersionInfo.props" Condition="$(MSBuildProjectDirectory.Contains('\ThirdParty\')) == false" />
 
   <!-- Build settings -->
   <PropertyGroup>
