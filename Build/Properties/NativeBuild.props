@@ -7,7 +7,10 @@
     />
   </Target>
 
-  <Import Project="$(MSBuildProjectDirectory)\Properties\$(MSBuildProjectName).props" />
+  <Import Project="$(MSBuildProjectDirectory)\Properties\$(MSBuildProjectName).props" Condition="Exists('$(MSBuildProjectDirectory)\Properties\$(MSBuildProjectName).props')" />
+  <PropertyGroup Condition="'$(ProductName)'==''">
+      <ProductName>$(SolutionName)</ProductName>
+  </PropertyGroup>
 
   <PropertyGroup>
     <ProjectLanguage>cpp</ProjectLanguage>
@@ -21,7 +24,7 @@
     <IntDir>$(TopLevelIntDir)</IntDir>
   </PropertyGroup>
 
-  <Import Project="$(MSBuildThisFileDirectory)GitVersionInfo.props" Condition="'$(BuildSettingsSkipGitVersionInfo)'==''"/>
+  <Import Project="$(MSBuildThisFileDirectory)GitVersionInfo.props" />
 
   <!-- Build settings -->
   <PropertyGroup>

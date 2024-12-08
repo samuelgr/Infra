@@ -177,6 +177,21 @@ if "yes"=="%project_has_sdk%" (
         )
     )
 
+    for %%P in (%project_platforms%) do (
+        if not ""=="%files_sdk_lib_build%!files_sdk_lib_build_%%P!" (
+            md %output_dir%\SDK\Lib\%%P
+
+            for %%F in (%files_sdk_lib_build% !files_sdk_lib_build_%%P!) do (
+                if exist Output\%build_output_subdirectory%\%%P\%%F (
+                    echo     Output\%build_output_subdirectory%\%%P\%%F
+                    copy "Output\%build_output_subdirectory%\%%P\%%F" "%output_dir%\SDK\Lib\%%P" >NUL 2>NUL
+                ) else (
+                    set files_are_missing=yes
+                )
+            )
+        )
+    )
+
     if not ""=="%files_sdk_include%" (
         md %output_dir%\SDK\Include
         md %output_dir%\SDK\Include\%project_name%
@@ -214,8 +229,8 @@ if "yes"=="%files_are_missing%" (
         )
     )
     for %%P in (%project_platforms%) do (
-        if not ""=="%files_release_build%!files_release_build_%%P!" (
-            for %%F in (%files_release_build% !files_release_build_%%P!) do (
+        if not ""=="%files_release_build%!files_release_build_%%P!%files_sdk_lib_build%!files_sdk_lib_build_%%P!" (
+            for %%F in (%files_release_build% !files_release_build_%%P! %files_sdk_lib_build% !files_sdk_lib_build_%%P!) do (
                 if not exist Output\%build_output_subdirectory%\%%P\%%F (
                     echo     Output\%build_output_subdirectory%\%%P\%%F
                 )
