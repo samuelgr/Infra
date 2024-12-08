@@ -2,10 +2,10 @@
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemDefinitionGroup>
     <ClCompile>
-      <AdditionalIncludeDirectories>$(MSBuildThisFileDirectory)\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(MSBuildThisFileDirectory)Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <MASM>
-      <IncludePaths>$(MSBuildThisFileDirectory)\Include;%(IncludePaths)</IncludePaths>
+      <IncludePaths>$(MSBuildThisFileDirectory)Include;%(IncludePaths)</IncludePaths>
     </MASM>
   </ItemDefinitionGroup>
 </Project>

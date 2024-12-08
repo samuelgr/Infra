@@ -7,7 +7,7 @@
     />
   </Target>
 
-  <Import Project="$(MSBuildProjectDirectory)\$(MSBuildProjectName).props" />
+  <Import Project="$(MSBuildProjectDirectory)\Properties\$(MSBuildProjectName).props" />
 
   <PropertyGroup>
     <ProjectLanguage>cpp</ProjectLanguage>
@@ -104,11 +104,9 @@
   </ItemDefinitionGroup>
   <ItemGroup />
 
-  <!-- Module dependencies -->
-  <Import Project="$(MSBuildThisFileDirectory)Modules.props" Condition="Exists('$(MSBuildThisFileDirectory)Modules.props')"/>
-
-  <!-- Third-party dependencies -->
-  <Import Project="$(MSBuildThisFileDirectory)ThirdParty.props" Condition="Exists('$(MSBuildThisFileDirectory)ThirdParty.props')"/>
+  <!-- Module and third-party dependencies -->
+  <Import Project="$(MSBuildThisFileDirectory)Modules.props" />
+  <Import Project="$(MSBuildThisFileDirectory)ThirdParty.props" />
 
   <!-- Resources and version information -->
   <PropertyGroup>
