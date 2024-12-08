@@ -330,8 +330,8 @@ namespace Infra
     }
 
     /// Changes this object's knowledge of its own size. This is generally an unsafe operation but
-    /// is intended to be used after the underlying buffer is manipulated directly by functions that
-    /// write to it directly.
+    /// is intended to be used after the underlying buffer is manipulated by functions that write to
+    /// it directly.
     /// @param [in] newsize New size to use.
     inline void UnsafeSetSize(unsigned int newsize)
     {
@@ -364,6 +364,21 @@ namespace Infra
     }
 
     inline TemporaryString(std::wstring_view str) : TemporaryVector<wchar_t>()
+    {
+      *this = str;
+    }
+
+    inline TemporaryString(const char* str) : TemporaryVector<wchar_t>()
+    {
+      *this = std::string_view(str);
+    }
+
+    inline TemporaryString(const std::string& str) : TemporaryVector<wchar_t>()
+    {
+      *this = std::string_view(str);
+    }
+
+    inline TemporaryString(std::string_view str) : TemporaryVector<wchar_t>()
     {
       *this = str;
     }
@@ -407,6 +422,23 @@ namespace Infra
       return *this;
     }
 
+    inline TemporaryString& operator=(const char* str)
+    {
+      return (*this = std::string_view(str));
+    }
+
+    inline TemporaryString& operator=(const std::string& str)
+    {
+      return (*this = std::string_view(str));
+    }
+
+    inline TemporaryString& operator=(std::string_view str)
+    {
+      Clear();
+      *this += str;
+      return *this;
+    }
+
     inline TemporaryString& operator+=(const wchar_t* str)
     {
       return (*this += std::wstring_view(str));
@@ -421,6 +453,25 @@ namespace Infra
     {
       for (unsigned int i = 0; (i < str.size()) && (Size() < (Capacity() - 1)); ++i)
         TemporaryVector<wchar_t>::PushBack(str[i]);
+
+      (*this)[size] = L'\0';
+      return *this;
+    }
+
+    inline TemporaryString& operator+=(const char* str)
+    {
+      return (*this += std::string_view(str));
+    }
+
+    inline TemporaryString& operator+=(const std::string& str)
+    {
+      return (*this += std::string_view(str));
+    }
+
+    inline TemporaryString& operator+=(std::string_view str)
+    {
+      for (unsigned int i = 0; (i < str.size()) && (Size() < (Capacity() - 1)); ++i)
+        TemporaryVector<wchar_t>::PushBack(static_cast<wchar_t>(str[i]));
 
       (*this)[size] = L'\0';
       return *this;
