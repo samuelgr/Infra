@@ -233,6 +233,18 @@ namespace Infra
 
     template <typename CharType> TemporaryVector<std::basic_string_view<CharType>> Split(
         std::basic_string_view<CharType> stringToSplit,
+        std::initializer_list<std::basic_string_view<CharType>> delimiters)
+    {
+      return Split(stringToSplit, delimiters.begin(), static_cast<unsigned int>(delimiters.size()));
+    }
+
+    template TemporaryVector<std::string_view> Split<char>(
+        std::string_view, std::initializer_list<std::string_view>);
+    template TemporaryVector<std::wstring_view> Split<wchar_t>(
+        std::wstring_view, std::initializer_list<std::wstring_view>);
+
+    template <typename CharType> TemporaryVector<std::basic_string_view<CharType>> Split(
+        std::basic_string_view<CharType> stringToSplit,
         const std::basic_string_view<CharType>* delimiters,
         unsigned int numDelimiters)
     {

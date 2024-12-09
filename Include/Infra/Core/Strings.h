@@ -15,6 +15,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <initializer_list>
 #include <limits>
 #include <optional>
 #include <string_view>
@@ -112,7 +113,7 @@ namespace Infra
       return str;
     }
 
-    /// Splits a string using the specified delimiter character and returns a list of views each
+    /// Splits a string using the specified delimiter string and returns a list of views, each
     /// corresponding to a part of the input string. If there are too many delimiters present
     /// such that not all of the pieces can fit into the returned container type then the
     /// returned container will be empty. Otherwise the returned container will contain at least
@@ -126,7 +127,21 @@ namespace Infra
     template <typename CharType> TemporaryVector<std::basic_string_view<CharType>> Split(
         std::basic_string_view<CharType> stringToSplit, std::basic_string_view<CharType> delimiter);
 
-    /// Splits a string using the specified delimiter strings and returns a list of views each
+    /// Splits a string using the specified delimiter strings and returns a list of views, each
+    /// corresponding to a part of the input string. If there are too many delimiters present such
+    /// that not all of the pieces can fit into the returned container type then the returned
+    /// container will be empty. Otherwise the returned container will contain at least one element.
+    /// @tparam CharType Type of character in each string, either narrow or wide.
+    /// @param [in] stringToSplit Input string to be split.
+    /// @param [in] delimiters Delimiter character sequences each of which identifies a boundary
+    /// between pieces of the input string.
+    /// @return Container that holds views referring to pieces of the input string split using the
+    /// specified delimiter.
+    template <typename CharType> TemporaryVector<std::basic_string_view<CharType>> Split(
+        std::basic_string_view<CharType> stringToSplit,
+        std::initializer_list<std::basic_string_view<CharType>> delimiters);
+
+    /// Splits a string using the specified delimiter strings and returns a list of views, each
     /// corresponding to a part of the input string. If there are too many delimiters present
     /// such that not all of the pieces can fit into the returned container type then the
     /// returned container will be empty. Otherwise the returned container will contain at least

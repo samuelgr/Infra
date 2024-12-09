@@ -219,6 +219,18 @@ namespace CoreInfraTest
     TEST_ASSERT(actualPieces == expectedPieces);
   }
 
+  // Same as the nominal case but with multiple delimiters of varying lengths, supplied in an
+  // initializer list.
+  TEST_CASE(Strings_Split_MultipleDelimitersInitializerList)
+  {
+    constexpr std::wstring_view kInputString = L"ABCD%EFGH//IJKL:::MNOP!!!QRSTUV%WX:::YZ";
+    const TemporaryVector<std::wstring_view> expectedPieces = {
+        L"ABCD", L"EFGH", L"IJKL", L"MNOP", L"QRSTUV", L"WX", L"YZ"};
+    const TemporaryVector<std::wstring_view> actualPieces =
+        Strings::Split<wchar_t>(kInputString, {L":::", L"%", L"!!!", L"//"});
+    TEST_ASSERT(actualPieces == expectedPieces);
+  }
+
   // No delimiters are present, so the entire string should be returned in one piece.
   TEST_CASE(Strings_Split_NoDelimiters)
   {
