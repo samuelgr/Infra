@@ -362,26 +362,21 @@ namespace Infra
           const std::wstring_view productVersion = maybeProductVersion->string;
           fwprintf_s(
               logFileHandle,
-              L"Product Version:  %.*s\n",
+              L"Version:        %.*s\n",
               static_cast<int>(productVersion.length()),
               productVersion.data());
         }
         fwprintf_s(
             logFileHandle,
-            L"Infra Version:    %.*s\n",
-            static_cast<int>(ProcessInfo::GetInfraVersion().string.length()),
-            ProcessInfo::GetInfraVersion().string.data());
-        fwprintf_s(logFileHandle, L"Process ID:       %d\n", ProcessInfo::GetCurrentProcessId());
-        fwprintf_s(
-            logFileHandle,
-            L"Executable:       %.*s\n",
-            static_cast<int>(ProcessInfo::GetExecutableCompleteFilename().length()),
-            ProcessInfo::GetExecutableCompleteFilename().data());
-        fwprintf_s(
-            logFileHandle,
-            L"Module:           %.*s\n",
+            L"Module:         %.*s\n",
             static_cast<int>(ProcessInfo::GetThisModuleCompleteFilename().length()),
             ProcessInfo::GetThisModuleCompleteFilename().data());
+        fwprintf_s(
+            logFileHandle,
+            L"Executable:     %.*s\n",
+            static_cast<int>(ProcessInfo::GetExecutableCompleteFilename().length()),
+            ProcessInfo::GetExecutableCompleteFilename().data());
+        fwprintf_s(logFileHandle, L"Process ID:     %d\n", ProcessInfo::GetCurrentProcessId());
         fwprintf_s(logFileHandle, L"%s\n", kLogHeaderSeparator);
         fflush(logFileHandle);
       }
