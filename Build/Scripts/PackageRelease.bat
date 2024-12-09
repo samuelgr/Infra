@@ -109,10 +109,8 @@ if not yes==%assume_always_yes% (
 if not yes==%digitally_sign_binaries% (
     set is_official_build=no
 
-    set git_commit_distance=%GIT_COMMIT_DISTANCE%
-    if "!git_commit_distance!"=="0" (
-        set git_is_dirty=%GIT_VERSION_IS_DIRTY%
-        if "!git_is_dirty!"=="0" (
+    if "%GIT_VERSION_COMMIT_DISTANCE%"=="0" (
+        if "%GIT_VERSION_IS_DIRTY%"=="0" (
             set is_official_build=yes
         )
     )
