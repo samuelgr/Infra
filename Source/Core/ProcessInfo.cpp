@@ -14,7 +14,6 @@
 #include <cstdint>
 #include <memory>
 #include <mutex>
-#include <optional>
 #include <string>
 #include <string_view>
 
@@ -26,11 +25,14 @@ namespace Infra
 {
   namespace ProcessInfo
   {
-    /// Name of the product represented by the running binary that contains this code.
-    static std::optional<std::wstring> productName;
-
-    /// Version of the product represented by the running binary that contains this code.
-    static std::optional<SVersionInfo> productVersion;
+    // Internal functions for retrieving product name and version information defined by users of
+    // this library. These functions are implemented when users of this library invoke the various
+    // INFRA_DEFINE_PRODUCT_* macros from the "ProcessInfo.h" header file.
+    namespace _ProductInformationInternal
+    {
+      std::wstring GetDefinedProductNameInternal(void);
+      SVersionInfo GetDefinedProductVersionInternal(void);
+    } // namespace _ProductInformationInternal
 
     HANDLE GetCurrentProcessHandle(void)
     {
@@ -82,13 +84,33 @@ namespace Infra
       return GitVersionInfoForCurrentProject();
     }
 
-    std::optional<std::wstring_view> GetProductName(void)
+    std::wstring_view GetProductName(void)
     {
+      static std::wstring productName;
+      static std::once_flag initFlag;
+
+      std::call_once(
+          initFlag,
+          []() -> void
+          {
+            productName = _ProductInformationInternal::GetDefinedProductNameInternal();
+          });
+
       return productName;
     }
 
-    std::optional<SVersionInfo> GetProductVersion(void)
+    SVersionInfo GetProductVersion(void)
     {
+      static SVersionInfo productVersion;
+      static std::once_flag initFlag;
+
+      std::call_once(
+          initFlag,
+          []() -> void
+          {
+            productVersion = _ProductInformationInternal::GetDefinedProductVersionInternal();
+          });
+
       return productVersion;
     }
 
@@ -209,28 +231,6 @@ namespace Infra
           });
 
       return thisModuleDirectoryName;
-    }
-
-    void SetProductInformation(std::wstring_view newProductName, SVersionInfo newProductVersion)
-    {
-      productName = newProductName;
-      productVersion = newProductVersion;
-    }
-
-    void SetProductInformation(
-        HINSTANCE newProductNameResourceModuleHandle,
-        UINT newProductNameResourceId,
-        SVersionInfo newProductVersion)
-    {
-      const wchar_t* stringStart = nullptr;
-      int stringLength = LoadString(
-          newProductNameResourceModuleHandle, newProductNameResourceId, (wchar_t*)&stringStart, 0);
-
-      while ((stringLength > 0) && (L'\0' == stringStart[stringLength - 1]))
-        stringLength -= 1;
-
-      SetProductInformation(
-          std::wstring_view(stringStart, static_cast<size_t>(stringLength)), newProductVersion);
     }
   } // namespace ProcessInfo
 } // namespace Infra

@@ -263,7 +263,7 @@ namespace Infra
           break;
       }
 
-      MessageBox(nullptr, message, ProcessInfo::GetThisModuleBaseName().data(), messageBoxType);
+      MessageBox(nullptr, message, ProcessInfo::GetProductName().data(), messageBoxType);
     }
 
     /// Outputs the specified message.
@@ -273,12 +273,11 @@ namespace Infra
     /// @param [in] message Message text.
     static void OutputInternal(const ESeverity severity, const wchar_t* message)
     {
-      // This mutex needs to be recursive specifically for Pathwinder because it hooks the
-      // `NtClose` system function, and the hook function itself might produce message output.
       // Internally, at least one of the message output functions (for example, graphical
-      // message box) use system objects and subsequently free them using `NtClose`. As a
-      // result, this function may be called more than once by the same thread, so a
-      // non-recursive mutex would lead to deadlock.
+      // message box) use system objects and subsequently free them using functions that might
+      // themselves be hooked such that the hook functions produce message outputs. As a result,
+      // this function may be called more than once by the same thread, so a non-recursive mutex
+      // would quickly lead to deadlock.
       static RecursiveMutex outputGuard;
 
       EOutputMode outputModes[static_cast<int>(EOutputMode::UpperBoundValue)];
@@ -338,16 +337,16 @@ namespace Infra
         {
           logFileHandle = nullptr;
           OutputFormatted(ESeverity::Error, L"%s - Unable to create log file.", logFilename.data());
-          return;
         }
+
+        if (nullptr == logFileHandle) return;
 
         // Output the log file header.
         static constexpr wchar_t kLogHeaderSeparator[] =
             L"---------------------------------------------";
         fwprintf_s(logFileHandle, L"%s\n", kLogHeaderSeparator);
 
-        const std::wstring_view productName =
-            ProcessInfo::GetProductName().value_or(ProcessInfo::GetExecutableBaseName());
+        const std::wstring_view productName = ProcessInfo::GetProductName();
         fwprintf_s(
             logFileHandle,
             L"%.*s Log\n",

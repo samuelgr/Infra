@@ -11,13 +11,72 @@
 
 #pragma once
 
-#include <optional>
 #include <string>
 #include <string_view>
 
 #include "ApiWindows.h"
 
 #include "GitVersionInfo.generated.h"
+
+/// Defines the product name using a wide-string literal. One of the product name and one of the
+/// product version macros must be invoked anywhere in the global scope in a project that uses Infra
+/// to ensure that the product name and version is set early at runtime.
+#define INFRA_DEFINE_PRODUCT_NAME_FROM_LITERAL(name)                                               \
+  namespace Infra                                                                                  \
+  {                                                                                                \
+    namespace ProcessInfo                                                                          \
+    {                                                                                              \
+      namespace _ProductInformationInternal                                                        \
+      {                                                                                            \
+        std::wstring GetDefinedProductNameInternal(void)                                           \
+        {                                                                                          \
+          return name;                                                                             \
+        }                                                                                          \
+      }                                                                                            \
+    }                                                                                              \
+  }
+
+/// Defines the product name using a string table resource. One of the product name and one of the
+/// product version macros must be invoked anywhere in the global scope in a project that uses Infra
+/// to ensure that the product name and version is set early at runtime.
+#define INFRA_DEFINE_PRODUCT_NAME_FROM_RESOURCE(hinstance, stringId)                               \
+  namespace Infra                                                                                  \
+  {                                                                                                \
+    namespace ProcessInfo                                                                          \
+    {                                                                                              \
+      namespace _ProductInformationInternal                                                        \
+      {                                                                                            \
+        std::wstring GetDefinedProductNameInternal(void)                                           \
+        {                                                                                          \
+          const wchar_t* stringStart = nullptr;                                                    \
+          int stringLength = LoadStringW(hinstance, stringId, (wchar_t*)&stringStart, 0);          \
+          if (0 == stringLength) return std::wstring(GetThisModuleBaseName());                     \
+          while ((stringLength > 0) && (L'\0' == stringStart[stringLength - 1]))                   \
+            stringLength -= 1;                                                                     \
+          return std::wstring(stringStart);                                                        \
+        }                                                                                          \
+      }                                                                                            \
+    }                                                                                              \
+  }
+
+/// Defines the product version using Git version information auto-populated for whatever project is
+/// being compiled that is using Infra. One of the product name and one of the product version
+/// macros must be invoked anywhere in the global scope in a project that uses Infra to ensure that
+/// the product name and version is set early at runtime.
+#define INFRA_DEFINE_PRODUCT_VERSION_FROM_GIT_VERSION_INFO()                                       \
+  namespace Infra                                                                                  \
+  {                                                                                                \
+    namespace ProcessInfo                                                                          \
+    {                                                                                              \
+      namespace _ProductInformationInternal                                                        \
+      {                                                                                            \
+        SVersionInfo GetDefinedProductVersionInternal(void)                                        \
+        {                                                                                          \
+          return GitVersionInfoForCurrentProject();                                                \
+        }                                                                                          \
+      }                                                                                            \
+    }                                                                                              \
+  }
 
 namespace Infra
 {
@@ -104,14 +163,13 @@ namespace Infra
     /// @return Version information structure for the Infra library.
     SVersionInfo GetInfraVersion(void);
 
-    /// Retrieves and returns the name of the product that corresponds to the running binary, if it
-    /// was initialized.
-    /// @return Name of the product for this running binary, if it was initialized.
-    std::optional<std::wstring_view> GetProductName(void);
+    /// Retrieves and returns the name of the product that corresponds to the running binary.
+    /// @return Name of the product for this running binary.
+    std::wstring_view GetProductName(void);
 
-    /// Retrieves and returns version information for this running binary, if it was initialized.
-    /// @return Version information structure for the product, if it was initialized.
-    std::optional<SVersionInfo> GetProductVersion(void);
+    /// Retrieves and returns version information for this running binary.
+    /// @return Version information structure for the product.
+    SVersionInfo GetProductVersion(void);
 
     /// Obtains the complete filename for the running executable.
     /// @return Complete filename of the running executable.
@@ -140,24 +198,5 @@ namespace Infra
     /// located, without a trailing backslash.
     /// @return Directory name of the module that contains this code.
     std::wstring_view GetThisModuleDirectoryName(void);
-
-    /// Sets product information, including name and version. Intended to be invoked during product
-    /// initialization.
-    /// @param [in] newProductName Name of the running product to be set.
-    /// @param [in] newProductVersion Version of the running product to be set.
-    void SetProductInformation(std::wstring_view newProductName, SVersionInfo newProductVersion);
-
-    /// Sets product information, including name and version. Intended to be invoked during product
-    /// initialization. The product name is set by loading the specified string from binary
-    /// resources.
-    /// @param [in] newProductNameResourceModuleHandle Instance handle for the loaded module that
-    /// contains the string resource that should be used as the product name.
-    /// @param [in] newProductNameResourceId Resource identifier of the string resource that should
-    /// be used as the product name.
-    /// @param [in] newProductVersion Version of the running product to be set.
-    void SetProductInformation(
-        HINSTANCE newProductNameResourceModuleHandle,
-        UINT newProductNameResourceId,
-        SVersionInfo newProductVersion);
   } // namespace ProcessInfo
 } // namespace Infra
