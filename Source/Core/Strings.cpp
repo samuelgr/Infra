@@ -79,19 +79,7 @@ namespace Infra
 
     TemporaryString ConvertNarrowToWide(const char* str)
     {
-      TemporaryString convertedStr;
-      size_t numCharsConverted = 0;
-
-      if (0 ==
-          mbstowcs_s(
-              &numCharsConverted,
-              convertedStr.Data(),
-              convertedStr.Capacity(),
-              str,
-              static_cast<size_t>(convertedStr.Capacity()) - 1))
-        convertedStr.UnsafeSetSize(static_cast<unsigned int>(numCharsConverted));
-
-      return convertedStr;
+      return TemporaryString(str);
     }
 
     TemporaryBuffer<char> ConvertWideToNarrow(const wchar_t* str)
@@ -171,15 +159,10 @@ namespace Infra
       }
       else
       {
-        for (; systemErrorLength > 0; --systemErrorLength)
-        {
-          if (L'\0' != systemErrorString[systemErrorLength] &&
-              !iswspace(systemErrorString[systemErrorLength]))
-            break;
-
-          systemErrorString[systemErrorLength] = L'\0';
-          systemErrorString.UnsafeSetSize(systemErrorLength);
-        }
+        systemErrorString.UnsafeSetSize(systemErrorLength - 1);
+        while (L'\0' == systemErrorString.Back() || iswspace(systemErrorString.Back()))
+          systemErrorString.RemoveSuffix(1);
+        if (L'.' != systemErrorString.Back()) systemErrorString += L'.';
       }
 
       return systemErrorString;

@@ -9,6 +9,8 @@
  *   Implementation of test utility functions.
  **************************************************************************************************/
 
+#include "Test/Utilities.h"
+
 #include <sal.h>
 
 #include <cstdarg>

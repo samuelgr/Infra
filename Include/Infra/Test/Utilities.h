@@ -6,7 +6,7 @@
  * Copyright (c) 2016-2024
  ***********************************************************************************************//**
  * @file Utilities.h
- *   Declaration of test utility functions.
+ *   Declaration of test utility types and functions.
  **************************************************************************************************/
 
 #pragma once

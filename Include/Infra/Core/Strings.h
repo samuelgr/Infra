@@ -72,7 +72,8 @@ namespace Infra
     /// @return Resulting string after all formatting is applied.
     TemporaryString Format(_Printf_format_string_ const wchar_t* format, ...);
 
-    /// Generates a string representation of a system error code.
+    /// Generates a string representation of a system error code. The resulting string will always
+    /// end in a period ('.') character.
     /// @param [in] systemErrorCode System error code for which to generate a string.
     /// @return String representation of the system error code.
     TemporaryString FromSystemErrorCode(const unsigned long systemErrorCode);

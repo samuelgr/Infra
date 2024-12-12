@@ -20,6 +20,32 @@ namespace CoreInfraTest
 {
   using namespace ::Infra;
 
+  // Verifies that strings are correctly formatted using the Format function.
+  TEST_CASE(Strings_Format)
+  {
+    const wchar_t* kInputFormatString = L"Integer %d and string %s are together in a sentence.";
+    const std::wstring_view expectedFormattedString =
+        L"Integer 77 and string teststr are together in a sentence.";
+    const TemporaryString actualFormattedString =
+        Strings::Format(kInputFormatString, 77, L"teststr");
+    TEST_ASSERT(actualFormattedString == expectedFormattedString);
+  }
+
+  // Verifies that strings that differ only by case have the same hash code computed for them and
+  // that strings that have different contents, other than case, are hashed differently.
+  TEST_CASE(Strings_HashCaseInsensitive)
+  {
+    constexpr std::wstring_view kInputString = L"This is an input test string.";
+    constexpr std::wstring_view kInputMatchingString = L"tHIS IS AN INPUT TEST STRING.";
+    constexpr std::wstring_view kInputNonMatchingString = L"This is a different input test string.";
+    TEST_ASSERT(
+        Strings::HashCaseInsensitive(kInputString) ==
+        Strings::HashCaseInsensitive(kInputMatchingString));
+    TEST_ASSERT(
+        Strings::HashCaseInsensitive(kInputString) !=
+        Strings::HashCaseInsensitive(kInputNonMatchingString));
+  }
+
   // The following sequence of tests, which together comprise the Tokenize suite, exercise the
   // Tokenize function.
 
@@ -352,8 +378,8 @@ namespace CoreInfraTest
   }
 
   // The following sequence of tests, which together comprise the Compare suite, exercise the
-  // string comparison operations CompareCaseInsensitive, EqualsCaseInsensitive, and
-  // StartsWithCaseInsensitive.
+  // string comparison operations CompareCaseInsensitive, EqualsCaseInsensitive,
+  // StartsWithCaseInsensitive, and EndsWithCaseInsensitive.
 
   // Tests case-insensitive string comparison for equality by providing some input strings that
   // are supposed to be equal to a fixed test string.
@@ -427,5 +453,21 @@ namespace CoreInfraTest
 
     for (const auto nonMatchingInput : kNonMatchingInputs)
       TEST_ASSERT(false == Strings::StartsWithCaseInsensitive(kTestString, nonMatchingInput));
+  }
+
+  // Tests case-insensitive string suffix matching by providing some matching and some
+  // non-matching inputs.
+  TEST_CASE(Strings_Compare_EndsWithCaseInsensitive)
+  {
+    constexpr std::wstring_view kTestString = L"TestStringAbCdEfG";
+    constexpr std::wstring_view kMatchingInputs[] = {L"g", L"CDEFG", L"stringabCDEFg"};
+    constexpr std::wstring_view kNonMatchingInputs[] = {
+        L"ATestStringAbCdEfG", L"TestString", L"Totally_unrelated_string"};
+
+    for (const auto matchingInput : kMatchingInputs)
+      TEST_ASSERT(true == Strings::EndsWithCaseInsensitive(kTestString, matchingInput));
+
+    for (const auto nonMatchingInput : kNonMatchingInputs)
+      TEST_ASSERT(false == Strings::EndsWithCaseInsensitive(kTestString, nonMatchingInput));
   }
 } // namespace CoreInfraTest

@@ -101,13 +101,13 @@ namespace Infra
       return *this;
     }
 
-    inline const T& operator[](size_t index) const
+    inline const T& operator[](unsigned int index) const
     {
       DebugAssert(index < Capacity(), "Index is out of bounds.");
       return Data()[index];
     }
 
-    inline T& operator[](size_t index)
+    inline T& operator[](unsigned int index)
     {
       DebugAssert(index < Capacity(), "Index is out of bounds.");
       return Data()[index];
@@ -179,10 +179,8 @@ namespace Infra
     inline TemporaryVector& operator=(const TemporaryVector& other)
     {
       Clear();
-
       for (unsigned int i = 0; i < other.size; ++i)
         EmplaceBack(other[i]);
-
       return *this;
     }
 
@@ -196,22 +194,16 @@ namespace Infra
     inline TemporaryVector& operator=(std::initializer_list<T> initializers)
     {
       Clear();
-
       for (auto init = initializers.begin(); init != initializers.end(); ++init)
         PushBack(std::move(*init));
-
       return *this;
     }
 
     inline bool operator==(const TemporaryVector& other) const
     {
       if (other.size != size) return false;
-
       for (unsigned int i = 0; i < size; ++i)
-      {
         if (other[i] != (*this)[i]) return false;
-      }
-
       return true;
     }
 
@@ -277,6 +269,8 @@ namespace Infra
     /// @return Reference to the constructed and inserted element.
     template <typename... Args> inline T& EmplaceBack(Args&&... args)
     {
+      DebugAssert(
+          size < TemporaryBuffer<T>::Capacity(), "Attempting to insert into a full container.");
       new (&((*this)[size])) T(std::forward<Args>(args)...);
       return (*this)[size++];
     }
@@ -305,6 +299,7 @@ namespace Infra
     /// Removes the last element from this container and destroys it.
     inline void PopBack(void)
     {
+      DebugAssert(size > 0, "Attempting to remove from an empty container.");
       (*this)[size--].~T();
     }
 
@@ -312,6 +307,8 @@ namespace Infra
     /// @param [in] value Value to be appended.
     inline void PushBack(const T& value)
     {
+      DebugAssert(
+          size < TemporaryBuffer<T>::Capacity(), "Attempting to insert into a full container.");
       (*this)[size++] = value;
     }
 
@@ -319,6 +316,8 @@ namespace Infra
     /// @param [in] value Value to be appended.
     inline void PushBack(T&& value)
     {
+      DebugAssert(
+          size < TemporaryBuffer<T>::Capacity(), "Attempting to insert into a full container.");
       (*this)[size++] = std::move(value);
     }
 
@@ -335,6 +334,7 @@ namespace Infra
     /// @param [in] newsize New size to use.
     inline void UnsafeSetSize(unsigned int newsize)
     {
+      DebugAssert(newsize < TemporaryBuffer<T>::Capacity(), "Size exceeds container capacity.");
       size = newsize;
     }
 
@@ -453,7 +453,6 @@ namespace Infra
     {
       for (unsigned int i = 0; (i < str.size()) && (Size() < (Capacity() - 1)); ++i)
         TemporaryVector<wchar_t>::PushBack(str[i]);
-
       (*this)[size] = L'\0';
       return *this;
     }
@@ -470,10 +469,19 @@ namespace Infra
 
     inline TemporaryString& operator+=(std::string_view str)
     {
-      for (unsigned int i = 0; (i < str.size()) && (Size() < (Capacity() - 1)); ++i)
-        TemporaryVector<wchar_t>::PushBack(static_cast<wchar_t>(str[i]));
+      const size_t availableCapacity =
+          static_cast<size_t>(Capacity()) - static_cast<size_t>(Size()) - 1;
+      wchar_t* const conversionDestination = &((*this)[size]);
 
-      (*this)[size] = L'\0';
+      size_t numConvertedChars = 0;
+      mbstowcs_s(
+          &numConvertedChars,
+          conversionDestination,
+          availableCapacity,
+          str.data(),
+          std::min(str.length(), availableCapacity));
+      if (numConvertedChars > 0)
+        UnsafeSetSize(size + static_cast<unsigned int>(numConvertedChars) - 1);
       return *this;
     }
 
@@ -628,6 +636,17 @@ namespace Infra
     {
       while (AsStringView().ends_with(trailingChar))
         RemoveSuffix(1);
+    }
+
+    /// Changes this object's knowledge of its own size. This is generally an unsafe operation but
+    /// is intended to be used after the underlying buffer is manipulated by functions that write to
+    /// it directly.
+    /// @param [in] newsize New size to use, not including the terminating null character.
+    inline void UnsafeSetSize(unsigned int newsize)
+    {
+      DebugAssert(newsize < (Capacity() - 1), "Size exceeds container capacity.");
+      TemporaryVector::UnsafeSetSize(newsize);
+      (*this)[size] = L'\0';
     }
 
     // These methods are unsafe in the context of null-terminated string manipulation.
