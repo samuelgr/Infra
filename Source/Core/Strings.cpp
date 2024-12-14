@@ -204,6 +204,17 @@ namespace Infra
     template size_t HashCaseInsensitive<char>(std::string_view);
     template size_t HashCaseInsensitive<wchar_t>(std::wstring_view);
 
+    std::wstring_view LoadFromStringTableResource(HINSTANCE instanceHandle, UINT stringResourceId)
+    {
+      const wchar_t* stringStart = nullptr;
+      int stringLength = LoadStringW(
+          Infra::ProcessInfo::GetThisModuleInstanceHandle(), 201, (wchar_t*)&stringStart, 0);
+      std::wstring_view loadedResourceString(stringStart, stringLength);
+      while (loadedResourceString.ends_with(L'\0'))
+        loadedResourceString.remove_suffix(1);
+      return loadedResourceString;
+    }
+    
     template <typename CharType> TemporaryVector<std::basic_string_view<CharType>> Split(
         std::basic_string_view<CharType> stringToSplit, std::basic_string_view<CharType> delimiter)
     {

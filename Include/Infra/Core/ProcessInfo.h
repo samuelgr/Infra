@@ -15,6 +15,7 @@
 #include <string_view>
 
 #include "ApiWindows.h"
+#include "Strings.h"
 
 #include "GitVersionInfo.generated.h"
 
@@ -39,7 +40,7 @@
 /// Defines the product name using a string table resource. One of the product name and one of the
 /// product version macros must be invoked anywhere in the global scope in a project that uses Infra
 /// to ensure that the product name and version is set early at runtime.
-#define INFRA_DEFINE_PRODUCT_NAME_FROM_RESOURCE(hinstance, stringId)                               \
+#define INFRA_DEFINE_PRODUCT_NAME_FROM_RESOURCE(hinstance, resourceStringId)                       \
   namespace Infra                                                                                  \
   {                                                                                                \
     namespace ProcessInfo                                                                          \
@@ -48,12 +49,11 @@
       {                                                                                            \
         std::wstring GetDefinedProductNameInternal(void)                                           \
         {                                                                                          \
-          const wchar_t* stringStart = nullptr;                                                    \
-          int stringLength = LoadStringW(hinstance, stringId, (wchar_t*)&stringStart, 0);          \
-          if (0 == stringLength) return std::wstring(GetThisModuleBaseName());                     \
-          while ((stringLength > 0) && (L'\0' == stringStart[stringLength - 1]))                   \
-            stringLength -= 1;                                                                     \
-          return std::wstring(stringStart);                                                        \
+          std::wstring_view loadedResourceString =                                                 \
+              ::Infra::Strings::LoadFromStringTableResource(hinstance, resourceStringId);          \
+          if (true == loadedResourceString.empty())                                                \
+            return std::wstring(::Infra::ProcessInfo::GetThisModuleBaseName());                    \
+          return std::wstring(loadedResourceString);                                               \
         }                                                                                          \
       }                                                                                            \
     }                                                                                              \

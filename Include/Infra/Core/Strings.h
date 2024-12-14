@@ -84,6 +84,15 @@ namespace Infra
     /// @return Resulting hash code for the input string.
     template <typename CharType> size_t HashCaseInsensitive(std::basic_string_view<CharType> str);
 
+    /// Safely loads the specified string resource from a module's string table. The returned view
+    /// is not necessarily null-terminated and points directly to the string resource itself.
+    /// @param [in] instanceHandle Instance handle of the module whose string table should be
+    /// searched.
+    /// @param [in] stringResourceid Identifier of the desired string resource.
+    /// @return Read-only view of the resource, or an empty view if the resource could not be
+    /// located.
+    std::wstring_view LoadFromStringTableResource(HINSTANCE instanceHandle, UINT stringResourceId);
+
     /// Removes the all occurrences of specified leading character from the input string view
     /// and returns the result.
     /// @tparam CharType Type of character in each string, either narrow or wide.
