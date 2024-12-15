@@ -5,8 +5,9 @@
  * Authored by Samuel Grossman
  * Copyright (c) 2016-2024
  ***********************************************************************************************//**
- * @file StringsTest.cpp
- *   Unit tests for functions that manipulate strings.
+ * @file TemporaryBufferTest.cpp
+ *   Unit tests for temporary buffer management functionality, including associated data
+ *   structures and container types built on top.
  **************************************************************************************************/
 
 #include "Core/TemporaryBuffer.h"
