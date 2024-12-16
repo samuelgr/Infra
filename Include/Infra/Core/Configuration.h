@@ -813,7 +813,7 @@ namespace Infra
 
       bool operator==(const ConfigurationData& rhs) const = default;
 
-      /// Clears all of the stored configuration data. Does not affect error messages.
+      /// Clears all of the stored configuration data.
       inline void Clear(void)
       {
         sections.clear();
