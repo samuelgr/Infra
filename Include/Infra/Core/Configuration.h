@@ -276,16 +276,19 @@ namespace Infra
 
       inline operator TIntegerView(void) const
       {
+        DebugAssert(true == TypeIsInteger(), "Object does not hold an integer value.");
         return intValue;
       }
 
       inline operator TBooleanView(void) const
       {
+        DebugAssert(true == TypeIsBoolean(), "Object does not hold a Boolean value.");
         return boolValue;
       }
 
       inline operator TStringView(void) const
       {
+        DebugAssert(true == TypeIsString(), "Object does not hold a string value.");
         return stringValue;
       }
 

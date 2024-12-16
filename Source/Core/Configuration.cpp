@@ -729,19 +729,16 @@ namespace Infra
 
     template <> TBooleanView Value::Get(void) const
     {
-      DebugAssert(true == TypeIsBoolean(), "Object does not hold a Boolean value.");
       return *this;
     }
 
     template <> TIntegerView Value::Get(void) const
     {
-      DebugAssert(true == TypeIsInteger(), "Object does not hold an integer value.");
       return *this;
     }
 
     template <> TStringView Value::Get(void) const
     {
-      DebugAssert(true == TypeIsString(), "Object does not hold a string value.");
       return *this;
     }
 
