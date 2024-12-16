@@ -22,7 +22,7 @@
 #include <type_traits>
 #include <vector>
 
-#include "TemporaryBuffer.h"
+#include "DebugAssert.h"
 
 /// Convenience wrapper around initializer list syntax for defining a configuration file section in
 /// a layout object. Specify a section name followed by a series of setting name and value type
@@ -47,7 +47,7 @@ namespace Infra
   namespace Configuration
   {
     /// Section name for all settings that appear at global scope (i.e. outside of a section).
-    inline constexpr wchar_t kSectionNameGlobal[] = L"";
+    inline constexpr std::wstring_view kSectionNameGlobal = L"";
 
     /// Enumerates possible directives that can be issued in response to a query on how to
     /// process a section or a name/value pair encountered in a configuration file.
@@ -96,6 +96,81 @@ namespace Infra
       StringMultiValue,
     };
 
+    /// Fully defines an action to take in response to a section or a value being read. Combines an
+    /// action with a possible error message.
+    class Action
+    {
+    public:
+
+      bool operator==(const Action& other) const = default;
+
+      /// Creates an action that specifies to process the section or value into the configuration
+      /// data object.
+      /// @return Action that says to process the current line.
+      static inline Action Process(void)
+      {
+        return Action(EAction::Process);
+      }
+
+      /// Creates an action that specifies to skip the section or value. It will not be inserted
+      /// into the configuration data object.
+      /// @return Action that says to skip the current line.
+      static inline Action Skip(void)
+      {
+        return Action(EAction::Skip);
+      }
+
+      /// Creates an action that specifies to raise an error for the section or value but without
+      /// specifying a reason. It will not be inserted into the configuration data object.
+      /// @return Action that says to raise an error for the current line.
+      static inline Action Error(void)
+      {
+        return Action(EAction::Error);
+      }
+
+      /// Creates an action that specifies to raise an error for the section or value. It will not
+      /// be inserted into the configuration data object and either the specified error message or a
+      /// default error message will be produced.
+      /// @return Action that says to raise an error for the current line.
+      template <typename StringType> static inline Action ErrorWithMessage(StringType errorMessage)
+      {
+        return Action(EAction::Error, std::wstring(errorMessage));
+      }
+
+      /// Retrieves the action enumerator specified by this object.
+      /// @return Action enumerator.
+      inline EAction GetAction(void) const
+      {
+        return action;
+      }
+
+      /// Retrieves a read-only view of the error message specified by this object.
+      /// @return View of the error message.
+      inline const std::wstring& GetErrorMessage(void) const
+      {
+        return errorMessage;
+      }
+
+      /// Determines whether or not this object contains an error message.
+      /// @return `true` if so, `false` otherwise.
+      inline bool HasErrorMessage(void) const
+      {
+        return (false == errorMessage.empty());
+      }
+
+    private:
+
+      Action(EAction action, std::wstring&& errorMessage = std::wstring())
+          : action(action), errorMessage(std::move(errorMessage))
+      {}
+
+      /// Action to be taken. One of the enumerators.
+      EAction action;
+
+      /// Error message. Only filled in if there is an error.
+      std::wstring errorMessage;
+    };
+
     /// Underlying type used for storing integer-typed values.
     using TIntegerValue = int64_t;
 
@@ -114,147 +189,128 @@ namespace Infra
     /// View type used for retrieving and returning string-typed values.
     using TStringView = std::wstring_view;
 
+    /// Determines if the specified type is an integer type, with Boolean type explicitly excluded.
+    template <typename MaybeIntegerType> concept IsIntegerType = std::conjunction_v<
+        std::is_integral<MaybeIntegerType>,
+        std::negation<std::is_same<MaybeIntegerType, bool>>>;
+
+    /// Determines if the specified type is exactly Boolean.
+    template <typename MaybeBooleanType> concept IsBooleanType =
+        std::is_same_v<MaybeBooleanType, bool>;
+
+    /// Determines if the specified type is a string type.
+    template <typename MaybeStringType> concept IsStringType =
+        std::is_convertible_v<MaybeStringType, TStringView>;
+
     /// Fourth-level object used to represent a single configuration value for a particular
     /// configuration setting.
     class Value
     {
     public:
 
-      /// Creates an integer-typed value by copying it.
-      inline Value(const TIntegerView& value, int lineNumber = 0)
-          : lineNumber(lineNumber), type(EValueType::Integer), intValue(value)
-      {}
+      /// Creates an integer-typed value.
+      template <typename IntegerType>
+        requires IsIntegerType<IntegerType>
+      inline Value(
+          IntegerType value,
+          EValueType type = EValueType::Integer,
+          std::wstring_view configFileName = std::wstring_view(),
+          int lineNumber = 0)
+          : configFileName(configFileName),
+            lineNumber(lineNumber),
+            type(type),
+            intValue(static_cast<TIntegerValue>(value))
+      {
+        DebugAssert(TypeIsInteger(), "Mismatch between value and type enumerator.");
+      }
 
-      /// Creates an integer-typed value by moving it.
-      inline Value(TIntegerValue&& value, int lineNumber = 0)
-          : lineNumber(lineNumber), type(EValueType::Integer), intValue(std::move(value))
-      {}
-
-      /// Creates a Boolean-typed value by copying it.
-      inline Value(const TBooleanView& value, int lineNumber = 0)
-          : lineNumber(lineNumber), type(EValueType::Boolean), boolValue(value)
-      {}
-
-      /// Creates a Boolean-typed value by moving it.
-      inline Value(TBooleanValue&& value, int lineNumber = 0)
-          : lineNumber(lineNumber), type(EValueType::Boolean), boolValue(std::move(value))
-      {}
+      /// Creates a Boolean-typed value.
+      template <typename BooleanType>
+        requires IsBooleanType<BooleanType>
+      inline Value(
+          BooleanType value,
+          EValueType type = EValueType::Boolean,
+          std::wstring_view configFileName = std::wstring_view(),
+          int lineNumber = 0)
+          : configFileName(configFileName), lineNumber(lineNumber), type(type), boolValue(value)
+      {
+        DebugAssert(TypeIsBoolean(), "Mismatch between value and type enumerator.");
+      }
 
       /// Creates a string-typed value by copying it.
-      inline Value(const TStringView& value, int lineNumber = 0)
-          : lineNumber(lineNumber), type(EValueType::String), stringValue(value)
-      {}
+      template <typename StringType>
+        requires IsStringType<StringType>
+      inline Value(
+          StringType value,
+          EValueType type = EValueType::String,
+          std::wstring_view configFileName = std::wstring_view(),
+          int lineNumber = 0)
+          : configFileName(configFileName), lineNumber(lineNumber), type(type), stringValue(value)
+      {
+        DebugAssert(TypeIsString(), "Mismatch between value and type enumerator.");
+      }
 
       /// Creates a string-typed value by moving it.
-      inline Value(TStringValue&& value, int lineNumber = 0)
-          : lineNumber(lineNumber), type(EValueType::String), stringValue(std::move(value))
-      {}
-
-      inline Value(const Value& other) : lineNumber(other.lineNumber), type(other.type)
+      inline Value(
+          TStringValue&& value,
+          EValueType type = EValueType::String,
+          std::wstring_view configFileName = std::wstring_view(),
+          int lineNumber = 0)
+          : configFileName(configFileName),
+            lineNumber(lineNumber),
+            type(type),
+            stringValue(std::move(value))
       {
-        switch (other.type)
-        {
-          case EValueType::Integer:
-            new (&intValue) TIntegerValue(other.intValue);
-            break;
-
-          case EValueType::Boolean:
-            new (&boolValue) TBooleanValue(other.boolValue);
-            break;
-
-          case EValueType::String:
-            new (&stringValue) TStringValue(other.stringValue);
-            break;
-
-          default:
-            break;
-        }
+        DebugAssert(TypeIsString(), "Mismatch between value and type enumerator.");
       }
 
-      inline Value(Value&& other) noexcept
-          : lineNumber(std::move(other.lineNumber)), type(std::move(other.type))
+      Value(const Value& other);
+
+      Value(Value&& other) noexcept;
+
+      ~Value(void);
+
+      bool operator<(const Value& rhs) const;
+
+      bool operator==(const Value& rhs) const;
+
+      inline operator TIntegerView(void) const
       {
-        switch (other.type)
-        {
-          case EValueType::Integer:
-            new (&intValue) TIntegerValue(std::move(other.intValue));
-            break;
-
-          case EValueType::Boolean:
-            new (&boolValue) TBooleanValue(std::move(other.boolValue));
-            break;
-
-          case EValueType::String:
-            new (&stringValue) TStringValue(std::move(other.stringValue));
-            break;
-
-          default:
-            break;
-        }
+        return intValue;
       }
 
-      inline ~Value(void)
+      inline operator TBooleanView(void) const
       {
-        switch (type)
-        {
-          case EValueType::Integer:
-            intValue.~TIntegerValue();
-            break;
-
-          case EValueType::Boolean:
-            boolValue.~TBooleanValue();
-            break;
-
-          case EValueType::String:
-            stringValue.~TStringValue();
-            break;
-
-          default:
-            break;
-        }
+        return boolValue;
       }
 
-      inline bool operator<(const Value& rhs) const
+      inline operator TStringView(void) const
       {
-        if (type < rhs.type)
-          return true;
-        else if (type > rhs.type)
-          return false;
-
-        switch (type)
-        {
-          case EValueType::Integer:
-            return (intValue < rhs.intValue);
-
-          case EValueType::Boolean:
-            return (boolValue < rhs.boolValue);
-
-          case EValueType::String:
-            return (stringValue < rhs.stringValue);
-
-          default:
-            return false;
-        }
+        return stringValue;
       }
 
-      inline bool operator==(const Value& rhs) const
+      /// Enables equality comparison with an integer value or literal.
+      template <typename IntegerType>
+        requires IsIntegerType<IntegerType>
+      inline bool operator==(IntegerType rhs) const
       {
-        if (type != rhs.type) return false;
+        return (TypeIsInteger() && (static_cast<TIntegerView>(rhs) == GetInteger()));
+      }
 
-        switch (type)
-        {
-          case EValueType::Integer:
-            return (intValue == rhs.intValue);
+      /// Enables equality comparison with a Boolean value or literal.
+      template <typename BooleanType>
+        requires IsBooleanType<BooleanType>
+      inline bool operator==(BooleanType rhs) const
+      {
+        return (TypeIsBoolean() && (static_cast<TBooleanView>(rhs) == GetBoolean()));
+      }
 
-          case EValueType::Boolean:
-            return (boolValue == rhs.boolValue);
-
-          case EValueType::String:
-            return (stringValue == rhs.stringValue);
-
-          default:
-            return false;
-        }
+      /// Enables equality comparison with a string value or literal.
+      template <typename StringType>
+        requires IsStringType<StringType>
+      inline bool operator==(const StringType& rhs) const
+      {
+        return (TypeIsString() && (TStringView(rhs) == GetString()));
       }
 
       /// Determines whether the type of value held by this object matches the template
@@ -264,16 +320,45 @@ namespace Infra
       /// this object, `false` otherwise.
       template <typename ValueType> bool TypeIs(void) const;
 
+      /// Determines whether or not the type of value held by this object is integer.
+      /// @return `true` if so, `false` otherwise.
+      bool TypeIsInteger(void) const;
+
+      /// Determines whether or not the type of value held by this object is Boolean.
+      /// @return `true` if so, `false` otherwise.
+      bool TypeIsBoolean(void) const;
+
+      /// Determines whether or not the type of value held by this object is string.
+      /// @return `true` if so, `false` otherwise.
+      bool TypeIsString(void) const;
+
       /// Extracts the value held by this object without checking for type-correctness and
       /// returns it using move semantics.
       /// @tparam ValueType Type of value to extract from this object.
       /// @return Value extracted from this object.
-      template <typename ValueType> ValueType ExtractValue(void);
+      template <typename ValueType> ValueType Extract(void);
+
+      /// Extracts the value held by this object and assumes it is integer type.
+      /// @return Extracted value.
+      TIntegerValue ExtractInteger(void);
+
+      /// Extracts the value held by this object and assumes it is Boolean type.
+      /// @return Extracted value.
+      TBooleanValue ExtractBoolean(void);
+
+      /// Extracts the value held by this object and assumes it is string type.
+      /// @return Extracted value.
+      TStringValue ExtractString(void);
+
+      inline std::wstring_view GetConfigFileName(void) const
+      {
+        return configFileName;
+      }
 
       /// Retrieves and returns the line number within the configuration file on which this
       /// value was located.
       /// @return Line number that corresponds to this value.
-      inline int GetLineNumber(void) const
+      inline int GetConfigFileLineNumber(void) const
       {
         return lineNumber;
       }
@@ -285,31 +370,29 @@ namespace Infra
         return type;
       }
 
-      /// Retrieves and returns an immutable reference to the stored value as an integer.
-      /// Does not ensure the type of value is actually integer.
-      /// @return Stored value.
-      inline const TIntegerView GetIntegerValue(void) const
-      {
-        return intValue;
-      }
+      /// Retrieves and returns an immutable view of the stored value without checking for
+      /// type-correctness.
+      /// @tparam ViewType Type of view to retrieve from this object.
+      /// @return View of the stored value.
+      template <typename ViewType> ViewType Get(void) const;
 
-      /// Retrieves and returns an immutable reference to the stored value as a Boolean.
-      /// Does not ensure the type of value is actually Boolean.
+      /// Retrieves and returns the stored value, which is assumed to be integer type.
       /// @return Stored value.
-      inline const TBooleanView GetBooleanValue(void) const
-      {
-        return boolValue;
-      }
+      TIntegerView GetInteger(void) const;
 
-      /// Retrieves and returns an immutable reference to the stored value as a string.
-      /// Does not ensure the type of value is actually string.
+      /// Retrieves and returns the stored value, which is assumed to be Boolean type.
       /// @return Stored value.
-      inline const TStringView GetStringValue(void) const
-      {
-        return stringValue;
-      }
+      TBooleanView GetBoolean(void) const;
+
+      /// Retrieves and returns a read-only view of the stored value, which is assumed to be string
+      /// type.
+      /// @return Read-only view of the stored value.
+      TStringView GetString(void) const;
 
     private:
+
+      /// Name of the configuration file on which this value was located.
+      std::wstring_view configFileName;
 
       /// Line number within the configuration file on which this value was located.
       int lineNumber;
@@ -340,139 +423,140 @@ namespace Infra
 
       /// Allows contents to be specified directly using multiple integer literals. Intended
       /// for use by tests.
-      template <
-          typename IntegerType,
-          std::enable_if_t<
-              std::conjunction_v<
-                  std::is_integral<IntegerType>,
-                  std::negation<std::is_same<IntegerType, bool>>>,
-              bool> = true>
+      template <typename IntegerType>
+        requires IsIntegerType<IntegerType>
       inline Name(std::initializer_list<IntegerType> values) : Name()
       {
         for (const auto& value : values)
-          InsertValue(Value((TIntegerView)value));
+          Insert(Value(
+              static_cast<TIntegerView>(value),
+              ((values.size() > 1) ? EValueType::IntegerMultiValue : EValueType::Integer)));
       }
 
       /// Allows contents to be specified directly using a single integer literal. Intended
       /// for use by tests.
-      template <
-          typename IntegerType,
-          std::enable_if_t<
-              std::conjunction_v<
-                  std::is_integral<IntegerType>,
-                  std::negation<std::is_same<IntegerType, bool>>>,
-              bool> = true>
+      template <typename IntegerType>
+        requires IsIntegerType<IntegerType>
       inline Name(IntegerType value) : Name({value})
       {}
 
       /// Allows contents to be specified directly using multiple Boolean literals. Intended
       /// for use by tests.
-      template <
-          typename BooleanType,
-          std::enable_if_t<std::is_same_v<BooleanType, bool>, bool> = true>
+      template <typename BooleanType>
+        requires IsBooleanType<BooleanType>
       inline Name(std::initializer_list<BooleanType> values) : Name()
       {
         for (const auto& value : values)
-          InsertValue(Value((TBooleanView)value));
+          Insert(Value(
+              static_cast<TBooleanView>(value),
+              ((values.size() > 1) ? EValueType::BooleanMultiValue : EValueType::Boolean)));
       }
 
       /// Allows contents to be specified directly using a single Boolean literal. Intended
       /// for use by tests.
-      template <
-          typename BooleanType,
-          std::enable_if_t<std::is_same_v<BooleanType, bool>, bool> = true>
+      template <typename BooleanType>
+        requires IsBooleanType<BooleanType>
       inline Name(BooleanType value) : Name({value})
       {}
 
       /// Allows contents to be specified directly using multiple string literals. Intended
       /// for use by tests.
-      template <
-          typename StringType,
-          std::enable_if_t<std::negation_v<std::is_integral<StringType>>, bool> = true>
+      template <typename StringType>
+        requires IsStringType<StringType>
       inline Name(std::initializer_list<StringType> values) : Name()
       {
         for (const auto& value : values)
-          InsertValue(Value(TStringView(value)));
+          Insert(Value(
+              TStringView(value),
+              ((values.size() > 1) ? EValueType::StringMultiValue : EValueType::String)));
       }
 
       /// Allows contents to be specified directly using a single string literal. Intended for
       /// use by tests.
-      template <
-          typename StringType,
-          std::enable_if_t<std::negation_v<std::is_integral<StringType>>, bool> = true>
+      template <typename StringType>
+        requires IsStringType<StringType>
       inline Name(StringType value) : Name({value})
       {}
 
       bool operator==(const Name& rhs) const = default;
 
+      inline const Value* operator->(void) const
+      {
+        return &(*values.begin());
+      }
+
+      inline const Value& operator*(void) const
+      {
+        return *values.begin();
+      }
+
       /// Extracts the first value from this configruation setting using move semantics.
       /// @tparam ValueType Expected value type of the configuration setting to extract.
       /// @return Extracted value if the value type matches the template parameter.
-      template <typename ValueType> std::optional<ValueType> ExtractFirstValue(void);
+      template <typename ValueType> std::optional<ValueType> ExtractFirst(void);
 
       /// Extracts the first Boolean value from this configuration setting using move
       /// semantics.
       /// @param [in] name Name of the configuration setting to extract.
       /// @return Extracted value if the value is of type Boolean.
-      inline std::optional<TBooleanValue> ExtractFirstBooleanValue(void)
+      inline std::optional<TBooleanValue> ExtractFirstBoolean(void)
       {
-        return ExtractFirstValue<TBooleanValue>();
+        return ExtractFirst<TBooleanValue>();
       }
 
       /// Extracts the first integer value from this configuration setting using move
       /// semantics.
       /// @param [in] name Name of the configuration setting to extract.
       /// @return Extracted value if the value is of type integer.
-      inline std::optional<TIntegerValue> ExtractFirstIntegerValue(void)
+      inline std::optional<TIntegerValue> ExtractFirstInteger(void)
       {
-        return ExtractFirstValue<TIntegerValue>();
+        return ExtractFirst<TIntegerValue>();
       }
 
       /// Extracts the first string value from this configuration setting using move
       /// semantics.
       /// @param [in] name Name of the configuration setting to extract.
       /// @return Extracted value if the value is of type string.
-      inline std::optional<TStringValue> ExtractFirstStringValue(void)
+      inline std::optional<TStringValue> ExtractFirstString(void)
       {
-        return ExtractFirstValue<TStringValue>();
+        return ExtractFirst<TStringValue>();
       }
 
       /// Extracts all values from this configuration setting using move semantics and returns
       /// them as a vector.
       /// @tparam ValueType Expected value type of the configuration setting to extract.
       /// @return Vector of extracted values if the value type matches the template parameter.
-      template <typename ValueType> std::optional<std::vector<ValueType>> ExtractValues(void);
+      template <typename ValueType> std::optional<std::vector<ValueType>> ExtractAll(void);
 
       /// Extracts all Boolean values from this configuration setting using move semantics and
       /// returns them as a vector.
       /// @return Vector of extracted Boolean values if the they are of type Boolean.
-      inline std::optional<std::vector<TBooleanValue>> ExtractBooleanValues(void)
+      inline std::optional<std::vector<TBooleanValue>> ExtractAllBooleans(void)
       {
-        return ExtractValues<TBooleanValue>();
+        return ExtractAll<TBooleanValue>();
       }
 
       /// Extracts all integer values from this configuration setting using move semantics and
       /// returns them as a vector.
       /// @return Vector of extracted Boolean values if the they are of type integer.
-      inline std::optional<std::vector<TIntegerValue>> ExtractIntegerValues(void)
+      inline std::optional<std::vector<TIntegerValue>> ExtractAllIntegers(void)
       {
-        return ExtractValues<TIntegerValue>();
+        return ExtractAll<TIntegerValue>();
       }
 
       /// Extracts all string values from this configuration setting using move semantics and
       /// returns them as a vector.
       /// @return Vector of extracted Boolean values if the they are of type string.
-      inline std::optional<std::vector<TStringValue>> ExtractStringValues(void)
+      inline std::optional<std::vector<TStringValue>> ExtractAllStrings(void)
       {
-        return ExtractValues<TStringValue>();
+        return ExtractAll<TStringValue>();
       }
 
-      /// Allows read-only access to the first stored value.
-      /// Useful for single-valued settings.
+      /// Allows read-only access to the first stored value. Useful for single-valued settings.
       /// @return First stored value.
-      inline const Value& GetFirstValue(void) const
+      inline const Value& GetFirst(void) const
       {
-        return *(values.begin());
+        return *(*this);
       }
 
       /// Retrieves and returns the type of the stored values for this configuration setting.
@@ -482,26 +566,34 @@ namespace Infra
       /// @return Type of the stored values.
       inline EValueType GetType(void) const
       {
-        if (ValueCount() < 1) return EValueType::Error;
-
-        return GetFirstValue().GetType();
+        if (Count() < 1) return EValueType::Error;
+        return GetFirst().GetType();
       }
 
       /// Stores a new value for the configuration setting represented by this object by
-      /// moving the input parameter. Will fail if the value already exists.
+      /// moving the input parameter. Will fail if the value already exists or if there is a type
+      /// mismatch between the value being inserted and the values already present.
       /// @param [in] value Value to insert.
       /// @return `true` on success, `false` on failure.
-      bool InsertValue(Value&& value)
+      inline bool Insert(Value&& value)
       {
+        if ((Count() >= 1) && (GetType() != value.GetType())) return false;
         return values.emplace(std::move(value)).second;
       }
 
       /// Determines if this configuration setting object is empty (i.e. contains no
       /// configuration data).
       /// @return `true` if so, `false` otherwise.
-      inline bool IsEmpty(void) const
+      inline bool Empty(void) const
       {
         return values.empty();
+      }
+
+      /// Determines if this configuration setting object has any values (i.e. is not empty).
+      /// @return `true` if so, `false` otherwise.
+      inline bool HasValue(void) const
+      {
+        return (false == Empty());
       }
 
       /// Determines whether the type of value held in this configuration setting matches the
@@ -514,21 +606,76 @@ namespace Infra
       /// this object, `false` otherwise.
       template <typename ValueType> inline bool TypeIs(void) const
       {
-        if (ValueCount() < 1) return false;
+        if (Count() < 1) return false;
+        return GetFirst().TypeIs<ValueType>();
+      }
 
-        return GetFirstValue().TypeIs<ValueType>();
+      /// Determines whether or not the type of value held by this configuration setting is integer.
+      /// @return `true` if so, `false` otherwise.
+      inline bool TypeIsInteger(void) const
+      {
+        return TypeIs<TIntegerValue>();
+      }
+
+      /// Determines whether or not the type of value held by this configuration setting is Boolean.
+      /// @return `true` if so, `false` otherwise.
+      bool TypeIsBoolean(void) const
+      {
+        return TypeIs<TBooleanValue>();
+      }
+
+      /// Determines whether or not the type of value held by this configuration setting is string.
+      /// @return `true` if so, `false` otherwise.
+      bool TypeIsString(void) const
+      {
+        return TypeIs<TStringValue>();
       }
 
       /// Retrieves the number of values present for the configuration setting represented by
       /// this object.
       /// @return Number of values present.
-      inline size_t ValueCount(void) const
+      inline size_t Count(void) const
       {
         return values.size();
       }
 
-      /// Allows read-only access to all values.
-      /// Useful for iterating.
+      /// Retrieves the first integer value, if this object is non-empty and contains one or more
+      /// integer values. Otherwise returns the specified default value instead.
+      /// @param [in] defaultValue Value to return if this object is empty or the wrong type.
+      /// @return First stored value or the specified default value.
+      template <typename IntegerType>
+        requires IsIntegerType<IntegerType>
+      inline TIntegerView ValueOr(IntegerType defaultValue) const
+      {
+        if (true == TypeIsInteger()) return GetFirst().GetInteger();
+        return defaultValue;
+      }
+
+      /// Retrieves the first Boolean value, if this object is non-empty and contains one or more
+      /// Boolean values. Otherwise returns the specified default value instead.
+      /// @param [in] defaultValue Value to return if this object is empty or the wrong type.
+      /// @return First stored value or the specified default value.
+      template <typename BooleanType>
+        requires IsBooleanType<BooleanType>
+      inline TBooleanView ValueOr(BooleanType defaultValue) const
+      {
+        if (true == TypeIsBoolean()) return GetFirst().GetBoolean();
+        return defaultValue;
+      }
+
+      /// Retrieves the first string value, if this object is non-empty and contains one or more
+      /// string values. Otherwise returns the specified default value instead.
+      /// @param [in] defaultValue Value to return if this object is empty or the wrong type.
+      /// @return First stored value or the specified default value.
+      template <typename StringType>
+        requires IsStringType<StringType>
+      inline TStringView ValueOr(StringType defaultValue) const
+      {
+        if (true == TypeIsString()) return GetFirst().GetString();
+        return TStringView(defaultValue);
+      }
+
+      /// Allows read-only access to all values. Useful for iterating.
       /// @return Container of all values.
       inline const TValues& Values(void) const
       {
@@ -561,113 +708,44 @@ namespace Infra
 
       bool operator==(const Section& rhs) const = default;
 
-      /// Allows read-only access to individual configuration settings by name, without bounds
-      /// checking.
+      /// Allows read-only access to individual configuration settings by name. Returns an empty
+      /// object if the specified name does not exist.
       inline const Name& operator[](std::wstring_view name) const
       {
-        return names.find(name)->second;
+        static const Name kEmptyName;
+        auto namesIter = names.find(name);
+        return ((names.cend() == namesIter) ? kEmptyName : namesIter->second);
+      }
+
+      /// Determines if a configuration setting of the specified name exists in the section
+      /// represented by this object.
+      /// @param [in] name Name of the configuration setting to check.
+      /// @return `true` if the setting exists, `false` otherwise.
+      inline bool Contains(std::wstring_view name) const
+      {
+        return names.contains(name);
+      }
+
+      /// Retrieves the number of configuration settings present for the section represented
+      /// by this object.
+      /// @return Number of configuration settings present.
+      inline size_t Count(void) const
+      {
+        return names.size();
       }
 
       /// Extracts the entire first configuration setting from this section using move
       /// semantics.
       /// @return Pair consisting of the configuration setting name and configuration setting
       /// object if this section is non-empty.
-      std::optional<std::pair<std::wstring, Name>> ExtractFirstName(void);
+      std::optional<std::pair<std::wstring, Name>> ExtractFirst(void);
 
-      /// Extracts the first value from the specified configruation setting using move
-      /// semantics. If the configuration setting is single-valued then it is destroyed.
-      /// @tparam ValueType Expected value type of the configuration setting to extract.
-      /// @return Extracted value if the value type matches the template parameter.
-      template <typename ValueType> std::optional<ValueType> ExtractFirstValue(
-          std::wstring_view name);
-
-      /// Extracts the first Boolean value from the specified configuration setting using move
-      /// semantics.
-      /// @param [in] name Name of the configuration setting to extract.
-      /// @return Extracted value if the value is of type Boolean.
-      inline std::optional<TBooleanValue> ExtractFirstBooleanValue(std::wstring_view name)
+      /// Allows read-only access to the first stored configuration setting.
+      /// @return First stored configuration setting.
+      inline TNames::const_iterator GetFirst(void) const
       {
-        return ExtractFirstValue<TBooleanValue>(name);
+        return names.begin();
       }
-
-      /// Extracts the first integer value from the specified configuration setting using move
-      /// semantics.
-      /// @param [in] name Name of the configuration setting to extract.
-      /// @return Extracted value if the value is of type integer.
-      inline std::optional<TIntegerValue> ExtractFirstIntegerValue(std::wstring_view name)
-      {
-        return ExtractFirstValue<TIntegerValue>(name);
-      }
-
-      /// Extracts the first string value from the specified configuration setting using move
-      /// semantics.
-      /// @param [in] name Name of the configuration setting to extract.
-      /// @return Extracted value if the value is of type string.
-      inline std::optional<TStringValue> ExtractFirstStringValue(std::wstring_view name)
-      {
-        return ExtractFirstValue<TStringValue>(name);
-      }
-
-      /// Extracts all values from the specified configuration setting using move semantics,
-      /// erasing the entire setting from this section data object and returning all the
-      /// values as a vector.
-      /// @tparam ValueType Expected value type of the configuration setting to extract.
-      /// @param [in] name Name of the configuration setting to extract.
-      /// @return Vector of extracted values, if the name exists in this section and is of the
-      /// correct type as identified by the template parameter.
-      template <typename ValueType> std::optional<std::vector<ValueType>> ExtractValues(
-          std::wstring_view name);
-
-      /// Extracts all Boolean values from the specified configuration setting using move
-      /// semantics, erasing the entire setting from this section data object and returning
-      /// all the values as a vector.
-      /// @param [in] name Name of the configuration setting to extract.
-      /// @return Vector of extracted values, if the name was successfully located and values
-      /// are of type Boolean.
-      inline std::optional<std::vector<TBooleanValue>> ExtractBooleanValues(std::wstring_view name)
-      {
-        return ExtractValues<TBooleanValue>(name);
-      }
-
-      /// Extracts all integer values from the specified configuration setting using move
-      /// semantics, erasing the entire setting from this section data object and returning
-      /// all the values as a vector.
-      /// @param [in] name Name of the configuration setting to extract.
-      /// @return Vector of extracted values, if the name was successfully located and values
-      /// are of type integer.
-      inline std::optional<std::vector<TIntegerValue>> ExtractIntegerValues(std::wstring_view name)
-      {
-        return ExtractValues<TIntegerValue>(name);
-      }
-
-      /// Extracts all string values from the specified configuration setting using move
-      /// semantics, erasing the entire setting from this section data object and returning
-      /// all the values as a vector.
-      /// @param [in] name Name of the configuration setting to extract.
-      /// @return Vector of extracted values, if the name was successfully located and values
-      /// are of type string.
-      inline std::optional<std::vector<TStringValue>> ExtractStringValues(std::wstring_view name)
-      {
-        return ExtractValues<TStringValue>(name);
-      }
-
-      /// Convenience wrapper for quickly attempting to obtain a single Boolean-typed
-      /// configuration value.
-      /// @param [in] name Name of the value for which to search within this section.
-      /// @return First value associated with the section and name, if it exists.
-      std::optional<TBooleanView> GetFirstBooleanValue(std::wstring_view name) const;
-
-      /// Convenience wrapper for quickly attempting to obtain a single Integer-typed
-      /// configuration value.
-      /// @param [in] name Name of the value for which to search within this section.
-      /// @return First value associated with the section and name, if it exists.
-      std::optional<TIntegerView> GetFirstIntegerValue(std::wstring_view name) const;
-
-      /// Convenience wrapper for quickly attempting to obtain a single string-typed
-      /// configuration value.
-      /// @param [in] name Name of the value for which to search within this section.
-      /// @return First value associated with the section and name, if it exists.
-      std::optional<TStringView> GetFirstStringValue(std::wstring_view name) const;
 
       /// Stores a new value for the specified configuration setting in the section
       /// represented by this object by moving the input parameter. Will fail if the value
@@ -675,43 +753,23 @@ namespace Infra
       /// @param [in] name Name of the configuration setting into which to insert the value.
       /// @param [in] value Value to insert.
       /// @return `true` on success, `false` on failure.
-      inline bool InsertValue(std::wstring_view name, Value&& value)
+      inline bool Insert(std::wstring_view name, Value&& value)
       {
         auto nameIterator = names.find(name);
-
         if (names.end() == nameIterator)
           nameIterator = names.emplace(std::wstring(name), Name()).first;
-
-        return nameIterator->second.InsertValue(std::move(value));
+        return nameIterator->second.Insert(std::move(value));
       }
 
       /// Determines if this configuration section data object is empty (i.e. contains no
       /// configuration data).
       /// @return `true` if so, `false` otherwise.
-      inline bool IsEmpty(void) const
+      inline bool Empty(void) const
       {
         return names.empty();
       }
 
-      /// Retrieves the number of configuration settings present for the section represented
-      /// by this object.
-      /// @return Number of configuration settings present.
-      inline size_t NameCount(void) const
-      {
-        return names.size();
-      }
-
-      /// Determines if a configuration setting of the specified name exists in the section
-      /// represented by this object.
-      /// @param [in] name Name of the configuration setting to check.
-      /// @return `true` if the setting exists, `false` otherwise.
-      inline bool NameExists(std::wstring_view name) const
-      {
-        return names.contains(name);
-      }
-
-      /// Allows read-only access to all configuration settings.
-      /// Useful for iterating.
+      /// Allows read-only access to all configuration settings. Useful for iterating.
       /// @return Container of all configuration settings.
       inline const TNames& Names(void) const
       {
@@ -744,32 +802,48 @@ namespace Infra
           sections.insert(section);
       }
 
-      /// Allows read-only access to individual sections by name, without bounds checking.
+      /// Allows read-only access to individual sections by name. Returns an empty object if the
+      /// specified section does not exist.
       inline const Section& operator[](std::wstring_view section) const
       {
-        return sections.find(section)->second;
+        static const Section kEmptySection;
+        auto sectionsIter = sections.find(section);
+        return ((sections.cend() == sectionsIter) ? kEmptySection : sectionsIter->second);
       }
 
-      /// Compares data contents and presence or absence of errors only, ignoring error
-      /// messages themselves.
-      inline bool operator==(const ConfigurationData& rhs) const
-      {
-        return ((sections == rhs.sections) && (HasReadErrors() == rhs.HasReadErrors()));
-      }
-
-      /// Clears all of the stored read error messages and frees up all of the memory space
-      /// they occupy. This method does not affect the return value of #HasReadErrors. Read
-      /// error messages indicate a problem that occurred while the configuration file that
-      /// produced this object was being read.
-      inline void ClearReadErrorMessages(void)
-      {
-        if (readErrors.has_value()) readErrors->clear();
-      }
+      bool operator==(const ConfigurationData& rhs) const = default;
 
       /// Clears all of the stored configuration data. Does not affect error messages.
       inline void Clear(void)
       {
         sections.clear();
+      }
+
+      /// Determines if a section of the specified name exists in the configuration
+      /// represented by this object.
+      /// @param [in] section Section name to check.
+      /// @return `true` if the setting exists, `false` otherwise.
+      inline bool Contains(std::wstring_view section) const
+      {
+        return sections.contains(section);
+      }
+
+      /// Determines if a section of the specified name exists in the configuration and, if so,
+      /// whether or not it contains a configuration setting of the specified name.
+      /// @param [in] section Section name to check.
+      /// @param [in] name Name of the configuration setting to check.
+      /// @return `true` if the setting exists, `false` otherwise.
+      inline bool Contains(std::wstring_view section, std::wstring_view name) const
+      {
+        return (Contains(section) && (*this)[section].Contains(name));
+      }
+
+      /// Retrieves the number of sections present in the configuration represented by this
+      /// object.
+      /// @return Number of configuration settings present.
+      inline size_t Count(void) const
+      {
+        return sections.size();
       }
 
       /// Extracts the specified section from this configuration data object using move
@@ -786,66 +860,12 @@ namespace Infra
       /// @param [in] section Section name to extract.
       /// @return Pair containing the extracted section name and extracted section object, if
       /// the section was successfully located.
-      std::optional<std::pair<std::wstring, Section>> ExtractSection(std::wstring_view section);
-
-      /// Convenience wrapper for quickly attempting to obtain a single Boolean-typed
-      /// configuration value.
-      /// @param [in] section Section name to search for the value.
-      /// @param [in] name Name of the value for which to search.
-      /// @return First value associated with the section and name, if it exists.
-      inline std::optional<TBooleanView> GetFirstBooleanValue(
-          std::wstring_view section, std::wstring_view name) const
+      inline std::optional<std::pair<std::wstring, Section>> ExtractSection(
+          std::wstring_view section)
       {
-        const auto sectionIterator = sections.find(section);
-        if (sections.cend() == sectionIterator) return std::nullopt;
-
-        return sectionIterator->second.GetFirstBooleanValue(name);
-      }
-
-      /// Convenience wrapper for quickly attempting to obtain a single Integer-typed
-      /// configuration value.
-      /// @param [in] section Section name to search for the value.
-      /// @param [in] name Name of the value for which to search.
-      /// @return First value associated with the section and name, if it exists.
-      inline std::optional<TIntegerView> GetFirstIntegerValue(
-          std::wstring_view section, std::wstring_view name) const
-      {
-        const auto sectionIterator = sections.find(section);
-        if (sections.cend() == sectionIterator) return std::nullopt;
-
-        return sectionIterator->second.GetFirstIntegerValue(name);
-      }
-
-      /// Convenience wrapper for quickly attempting to obtain a single string-typed
-      /// configuration value.
-      /// @param [in] section Section name to search for the value.
-      /// @param [in] name Name of the value for which to search.
-      /// @return First value associated with the section and name, if it exists.
-      inline std::optional<TStringView> GetFirstStringValue(
-          std::wstring_view section, std::wstring_view name) const
-      {
-        const auto sectionIterator = sections.find(section);
-        if (sections.cend() == sectionIterator) return std::nullopt;
-
-        return sectionIterator->second.GetFirstStringValue(name);
-      }
-
-      /// Retrieves and returns the error messages that arose during the configuration file
-      /// read attempt that produced this object. Does not check that read error messages
-      /// actually exist.
-      /// @return Error messages from last configuration file read attempt.
-      inline const std::vector<std::wstring>& GetReadErrorMessages(void) const
-      {
-        return *readErrors;
-      }
-
-      /// Specifies whether or not any errors arose during the configuration file read attempt
-      /// that produced this object. More details on any errors that arose are available by
-      /// examining the error messages, unless they have already been cleared
-      /// @return `true` if so, `false` if not.
-      inline bool HasReadErrors(void) const
-      {
-        return readErrors.has_value();
+        auto sectionIterator = sections.find(section);
+        if (sections.end() == sectionIterator) return std::nullopt;
+        return ExtractSection(sectionIterator);
       }
 
       /// Stores a new value for the specified configuration setting in the specified section
@@ -854,62 +874,20 @@ namespace Infra
       /// @param [in] name Name of the configuration setting into which to insert the value.
       /// @param [in] value Value to insert.
       /// @return `true` on success, `false` on failure.
-      bool InsertValue(std::wstring_view section, std::wstring_view name, Value&& value)
+      inline bool Insert(std::wstring_view section, std::wstring_view name, Value&& value)
       {
         auto sectionIterator = sections.find(section);
-
         if (sections.end() == sectionIterator)
           sectionIterator = sections.emplace(section, Section()).first;
-
-        return sectionIterator->second.InsertValue(name, std::move(value));
-      }
-
-      /// Inserts an error message into the list of error messages.
-      /// Each such error message is a semantically-rich description of an error that occurred
-      /// during the configuration file read attempt that fills this object.
-      inline void InsertReadErrorMessage(std::wstring_view errorMessage)
-      {
-        if (false == readErrors.has_value()) readErrors.emplace();
-
-        readErrors->emplace_back(errorMessage);
+        return sectionIterator->second.Insert(name, std::move(value));
       }
 
       /// Determines if this configuration data object is empty (i.e. contains no
       /// configuration data).
       /// @return `true` if so, `false` otherwise.
-      inline bool IsEmpty(void) const
+      inline bool Empty(void) const
       {
         return sections.empty();
-      }
-
-      /// Retrieves the number of sections present in the configuration represented by this
-      /// object.
-      /// @return Number of configuration settings present.
-      inline size_t SectionCount(void) const
-      {
-        return sections.size();
-      }
-
-      /// Determines if a section of the specified name exists in the configuration
-      /// represented by this object.
-      /// @param [in] section Section name to check.
-      /// @return `true` if the setting exists, `false` otherwise.
-      inline bool SectionExists(std::wstring_view section) const
-      {
-        return sections.contains(section);
-      }
-
-      /// Determines if a configuration setting of the specified name exists in the specified
-      /// section.
-      /// @param [in] section Section name to check.
-      /// @param [in] name Name of the configuration setting to check.
-      /// @return `true` if the setting exists, `false` otherwise.
-      inline bool SectionNamePairExists(std::wstring_view section, std::wstring_view name) const
-      {
-        auto sectionIterator = sections.find(section);
-        if (sections.end() == sectionIterator) return false;
-
-        return sectionIterator->second.NameExists(name);
       }
 
       /// Allows read-only access to all sections.
@@ -923,16 +901,12 @@ namespace Infra
       /// Converts the entire contents of this object into a configuration file string.
       /// @return String that contains a configuration file representation of the data held by
       /// this object.
-      TemporaryString ToConfigurationFileString(void) const;
+      std::wstring ToConfigurationFileString(void) const;
 
     private:
 
       /// Holds configuration data at the level of entire sections, one element per section.
       TSections sections;
-
-      /// Holds the error messages that describes any errors that occurred during
-      /// configuration file read.
-      std::optional<std::vector<std::wstring>> readErrors;
     };
 
     /// Interface for reading and parsing INI-formatted configuration files.
@@ -945,6 +919,24 @@ namespace Infra
     public:
 
       virtual ~ConfigurationFileReader(void) = default;
+
+      /// Retrieves and returns the error messages that arose during the configuration file
+      /// read attempt that produced this object. Does not check that error messages
+      /// actually exist.
+      /// @return Error messages from last configuration file read attempt.
+      inline const std::vector<std::wstring>& GetErrorMessages(void) const
+      {
+        return *errorMessages;
+      }
+
+      /// Specifies whether or not any errors arose during the configuration file read attempt
+      /// that produced this object. More details on any errors that arose are available by
+      /// examining the error messages, unless they have already been cleared
+      /// @return `true` if so, `false` if not.
+      inline bool HasErrorMessages(void) const
+      {
+        return errorMessages.has_value();
+      }
 
       /// Reads and parses a configuration file, storing the settings in the supplied
       /// configuration object. Intended to be invoked externally. Subclasses should not
@@ -979,35 +971,6 @@ namespace Infra
       /// does nothing.
       virtual void EndRead(void);
 
-      /// Sets a semantically-rich error message to be presented to the user in response to a
-      /// subclass returning an error when asked what action to take. If a subclass does not
-      /// set a semantically-rich error message then the default error message is used
-      /// instead. Intended to be invoked optionally by subclasses during any method calls
-      /// that return #EAction but only when #EAction::Error is being returned.
-      /// @param [in] errorMessage String that is consumed to provide a semantically-rich
-      /// error message.
-      inline void SetLastErrorMessage(std::wstring&& errorMessage)
-      {
-        lastErrorMessage = std::move(errorMessage);
-      }
-
-      /// Convenience wrapper that sets a semantically-rich error message using a string view.
-      /// @param [in] errorMessage String view that is copied to provide a semantically-rich
-      /// error message.
-      inline void SetLastErrorMessage(std::wstring_view errorMessage)
-      {
-        SetLastErrorMessage(std::wstring(errorMessage));
-      }
-
-      /// Convenience wrapper that sets a semantically-rich error message using a
-      /// null-terminated C-style string.
-      /// @param [in] errorMessage Temporary buffer containing a null-terminated string that
-      /// is copied to provide a semantically-rich error message.
-      inline void SetLastErrorMessage(const wchar_t* errorMessage)
-      {
-        SetLastErrorMessage(std::wstring(errorMessage));
-      }
-
       /// Specifies the action to take when a given section is encountered in a configuration
       /// file (i.e. the names that typically appear in [square brackets] and separate the
       /// configuration file into namespaces). Invoked while reading from a configuration
@@ -1015,7 +978,7 @@ namespace Infra
       /// name however they see fit and indicate to the caller what action to take.
       /// @param [in] section Name of the section, as read from the configuration file.
       /// @return Action to take with the section.
-      virtual EAction ActionForSection(std::wstring_view section) = 0;
+      virtual Action ActionForSection(std::wstring_view section) = 0;
 
       /// Invoked to allow the subclass to process the specified integer-typed configuration
       /// setting, identified by enclosing section name and by configuration setting name.
@@ -1030,7 +993,7 @@ namespace Infra
       /// @param [in] value View of the value of the configuration setting, as read and parsed
       /// from the configuration file.
       /// @return Action to take with the name/value pair.
-      virtual EAction ActionForValue(
+      virtual Action ActionForValue(
           std::wstring_view section, std::wstring_view name, TIntegerView value) = 0;
 
       /// Invoked to allow the subclass to process the specified Boolean-typed configuration
@@ -1046,7 +1009,7 @@ namespace Infra
       /// @param [in] value View of the value of the configuration setting, as read and parsed
       /// from the configuration file.
       /// @return Action to take with the name/value pair.
-      virtual EAction ActionForValue(
+      virtual Action ActionForValue(
           std::wstring_view section, std::wstring_view name, TBooleanView value) = 0;
 
       /// Invoked to allow the subclass to process specified string-typed configuration
@@ -1062,7 +1025,7 @@ namespace Infra
       /// @param [in] value View of the value of the configuration setting, as read and parsed
       /// from the configuration file.
       /// @return Action to take with the name/value pair.
-      virtual EAction ActionForValue(
+      virtual Action ActionForValue(
           std::wstring_view section, std::wstring_view name, TStringView value) = 0;
 
       /// Specifies the type of the value for the given configuration setting.
@@ -1081,20 +1044,10 @@ namespace Infra
 
     private:
 
-      /// Used internally to retrieve and reset a semantically-rich error message if it
-      /// exists.
-      /// @return Last error message.
-      inline std::wstring GetLastErrorMessage(void)
-      {
-        return std::move(lastErrorMessage);
-      }
-
-      /// Used internally to determine if a semantically-rich error message exists.
-      /// @return `true` if an error message has been set, `false` otherwise.
-      inline bool HasLastErrorMessage(void) const
-      {
-        return !(lastErrorMessage.empty());
-      }
+      /// Appends an error message into the list of error messages associated with the file read
+      /// attempt. Each such error message is a semantically-rich description of an error that
+      /// occurred during the configuration file read attempt that fills this object.
+      void AppendErrorMessage(std::wstring_view errorMessage);
 
       /// Internal implementation of reading and parsing configuration files from any source.
       /// @tparam ReadHandleType Handle that implements the functions required to read one
@@ -1106,11 +1059,9 @@ namespace Infra
       template <typename ReadHandleType> ConfigurationData ReadConfiguration(
           ReadHandleType& readHandle, std::wstring_view configSourceName);
 
-      /// Holds a semantically-rich error message to be presented to the user whenever there
-      /// is an error processing a configuration value. Used for temporary internal state
-      /// only. These messages are subsequently stored in the configuration data object into
-      /// which a configuration file is being read.
-      std::wstring lastErrorMessage;
+      /// Holds the error messages that describes any errors that occurred during
+      /// configuration file read.
+      std::optional<std::vector<std::wstring>> errorMessages;
     };
 
     /// Type alias for a suggested format for storing the supported layout of a section within a

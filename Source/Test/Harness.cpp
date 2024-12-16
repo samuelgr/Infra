@@ -64,8 +64,6 @@ namespace Infra
 
       do
       {
-        ScopedExpectDebugAssertion();
-
         for (auto testCaseIterator = testCases.begin(); testCaseIterator != testCases.end();
              ++testCaseIterator)
         {

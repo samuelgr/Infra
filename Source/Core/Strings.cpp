@@ -214,7 +214,7 @@ namespace Infra
         loadedResourceString.remove_suffix(1);
       return loadedResourceString;
     }
-    
+
     template <typename CharType> TemporaryVector<std::basic_string_view<CharType>> Split(
         std::basic_string_view<CharType> stringToSplit, std::basic_string_view<CharType> delimiter)
     {

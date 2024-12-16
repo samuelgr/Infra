@@ -19,6 +19,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="Source\Test\Case\ConfigurationTest.cpp" />
     <ClCompile Include="Source\Test\Case\StringsTest.cpp" />
     <ClCompile Include="Source\Test\Case\TemporaryBufferTest.cpp" />
     <ClCompile Include="Source\Test\TestMain.cpp" />

@@ -19,10 +19,12 @@
 #include <cstring>
 #include <limits>
 #include <optional>
+#include <sstream>
 #include <string>
 #include <string_view>
 #include <vector>
 
+#include "Core/DebugAssert.h"
 #include "Core/Strings.h"
 #include "Core/TemporaryBuffer.h"
 
@@ -104,6 +106,25 @@ namespace Infra
         return false;
       }
     };
+
+    /// Determines and returns the canonical single-valued type for each possible multi-valued type
+    /// enumerator.
+    /// @param [in] valueType Type for which a canonical single-valued enumerator is desired.
+    /// @return Canonical single-valued enumerator, which might be the same as the input parameter.
+    static EValueType CanonicalSingleValueType(EValueType valueType)
+    {
+      switch (valueType)
+      {
+        case EValueType::IntegerMultiValue:
+          return EValueType::Integer;
+        case EValueType::BooleanMultiValue:
+          return EValueType::Boolean;
+        case EValueType::StringMultiValue:
+          return EValueType::String;
+        default:
+          return valueType;
+      }
+    }
 
     /// Tests if the supplied character is allowed as a configuration setting name (the part
     /// before the '=' sign in the configuration file).
@@ -496,6 +517,126 @@ namespace Infra
       return numCharsWritten;
     }
 
+    Value::Value(const Value& other)
+        : configFileName(other.configFileName), lineNumber(other.lineNumber), type(other.type)
+    {
+      switch (other.type)
+      {
+        case EValueType::Integer:
+        case EValueType::IntegerMultiValue:
+          new (&intValue) TIntegerValue(other.intValue);
+          break;
+
+        case EValueType::Boolean:
+        case EValueType::BooleanMultiValue:
+          new (&boolValue) TBooleanValue(other.boolValue);
+          break;
+
+        case EValueType::String:
+        case EValueType::StringMultiValue:
+          new (&stringValue) TStringValue(other.stringValue);
+          break;
+
+        default:
+          break;
+      }
+    }
+
+    Value::Value(Value&& other) noexcept
+        : configFileName(std::move(other.configFileName)),
+          lineNumber(std::move(other.lineNumber)),
+          type(std::move(other.type))
+    {
+      switch (other.type)
+      {
+        case EValueType::Integer:
+        case EValueType::IntegerMultiValue:
+          new (&intValue) TIntegerValue(std::move(other.intValue));
+          break;
+
+        case EValueType::Boolean:
+        case EValueType::BooleanMultiValue:
+          new (&boolValue) TBooleanValue(std::move(other.boolValue));
+          break;
+
+        case EValueType::String:
+        case EValueType::StringMultiValue:
+          new (&stringValue) TStringValue(std::move(other.stringValue));
+          break;
+
+        default:
+          break;
+      }
+    }
+
+    Value::~Value(void)
+    {
+      switch (type)
+      {
+        case EValueType::Integer:
+        case EValueType::IntegerMultiValue:
+          intValue.~TIntegerValue();
+          break;
+
+        case EValueType::Boolean:
+        case EValueType::BooleanMultiValue:
+          boolValue.~TBooleanValue();
+          break;
+
+        case EValueType::String:
+        case EValueType::StringMultiValue:
+          stringValue.~TStringValue();
+          break;
+
+        default:
+          break;
+      }
+    }
+
+    bool Value::operator<(const Value& rhs) const
+    {
+      const EValueType thisCanonicalType = CanonicalSingleValueType(GetType());
+      const EValueType rhsCanonicalType = CanonicalSingleValueType(rhs.GetType());
+
+      if (thisCanonicalType < rhsCanonicalType)
+        return true;
+      else if (thisCanonicalType > rhsCanonicalType)
+        return false;
+
+      switch (thisCanonicalType)
+      {
+        case EValueType::Integer:
+          return (intValue < rhs.intValue);
+        case EValueType::Boolean:
+          return (boolValue < rhs.boolValue);
+        case EValueType::String:
+          return (stringValue < rhs.stringValue);
+        default:
+          return false;
+      }
+    }
+
+    bool Value::operator==(const Value& rhs) const
+    {
+      switch (GetType())
+      {
+        case EValueType::Integer:
+        case EValueType::IntegerMultiValue:
+          return ((rhs.TypeIsInteger()) && (intValue == rhs.intValue));
+
+        case EValueType::Boolean:
+        case EValueType::BooleanMultiValue:
+          return ((rhs.TypeIsBoolean()) && (boolValue == rhs.boolValue));
+
+        case EValueType::String:
+        case EValueType::StringMultiValue:
+          return ((rhs.TypeIsString()) && (stringValue == rhs.stringValue));
+
+        default:
+          return false;
+      }
+    }
+
     template <> bool Value::TypeIs<TBooleanValue>(void) const
     {
       switch (GetType())
@@ -535,33 +676,101 @@ namespace Infra
       }
     }
 
-    template <> TBooleanValue Value::ExtractValue(void)
+    bool Value::TypeIsInteger(void) const
     {
+      return TypeIs<TIntegerValue>();
+    }
+
+    bool Value::TypeIsBoolean(void) const
+    {
+      return TypeIs<TBooleanValue>();
+    }
+
+    bool Value::TypeIsString(void) const
+    {
+      return TypeIs<TStringValue>();
+    }
+
+    template <> TBooleanValue Value::Extract(void)
+    {
+      DebugAssert(true == TypeIsBoolean(), "Object does not hold a Boolean value.");
+      type = EValueType::Error;
       return std::move(boolValue);
     }
 
-    template <> TIntegerValue Value::ExtractValue(void)
+    template <> TIntegerValue Value::Extract(void)
     {
+      DebugAssert(true == TypeIsInteger(), "Object does not hold an integer value.");
+      type = EValueType::Error;
       return std::move(intValue);
     }
 
-    template <> TStringValue Value::ExtractValue(void)
+    template <> TStringValue Value::Extract(void)
     {
+      DebugAssert(true == TypeIsString(), "Object does not hold a string value.");
+      type = EValueType::Error;
       return std::move(stringValue);
     }
 
-    template <typename ValueType> std::optional<ValueType> Name::ExtractFirstValue(void)
+    TIntegerValue Value::ExtractInteger(void)
     {
-      if (false == TypeIs<ValueType>()) return std::nullopt;
-
-      return values.extract(values.begin()).value().ExtractValue<ValueType>();
+      return Extract<TIntegerValue>();
     }
 
-    template std::optional<TBooleanValue> Name::ExtractFirstValue(void);
-    template std::optional<TIntegerValue> Name::ExtractFirstValue(void);
-    template std::optional<TStringValue> Name::ExtractFirstValue(void);
+    TBooleanValue Value::ExtractBoolean(void)
+    {
+      return Extract<TBooleanValue>();
+    }
 
-    template <typename ValueType> std::optional<std::vector<ValueType>> Name::ExtractValues(void)
+    TStringValue Value::ExtractString(void)
+    {
+      return Extract<TStringValue>();
+    }
+
+    template <> TBooleanView Value::Get(void) const
+    {
+      DebugAssert(true == TypeIsBoolean(), "Object does not hold a Boolean value.");
+      return *this;
+    }
+
+    template <> TIntegerView Value::Get(void) const
+    {
+      DebugAssert(true == TypeIsInteger(), "Object does not hold an integer value.");
+      return *this;
+    }
+
+    template <> TStringView Value::Get(void) const
+    {
+      DebugAssert(true == TypeIsString(), "Object does not hold a string value.");
+      return *this;
+    }
+
+    TIntegerView Value::GetInteger(void) const
+    {
+      return Get<TIntegerView>();
+    }
+
+    TBooleanView Value::GetBoolean(void) const
+    {
+      return Get<TBooleanView>();
+    }
+
+    TStringView Value::GetString(void) const
+    {
+      return Get<TStringView>();
+    }
+
+    template <typename ValueType> std::optional<ValueType> Name::ExtractFirst(void)
+    {
+      if (false == TypeIs<ValueType>()) return std::nullopt;
+      return values.extract(values.begin()).value().Extract<ValueType>();
+    }
+
+    template std::optional<TBooleanValue> Name::ExtractFirst(void);
+    template std::optional<TIntegerValue> Name::ExtractFirst(void);
+    template std::optional<TStringValue> Name::ExtractFirst(void);
+
+    template <typename ValueType> std::optional<std::vector<ValueType>> Name::ExtractAll(void)
     {
       if (false == TypeIs<ValueType>()) return std::nullopt;
 
@@ -570,120 +779,24 @@ namespace Infra
 
       while (false == values.empty())
       {
-        Value extractedValue = std::move(values.extract(values.begin()).value());
-        extractedValues.emplace_back(extractedValue.ExtractValue<ValueType>());
+        ValueType extractedValue = values.extract(values.begin()).value().Extract<ValueType>();
+        extractedValues.emplace_back(std::move(extractedValue));
       }
 
       return std::move(extractedValues);
     }
 
-    template std::optional<std::vector<TBooleanValue>> Name::ExtractValues<TBooleanValue>(void);
-    template std::optional<std::vector<TIntegerValue>> Name::ExtractValues<TIntegerValue>(void);
-    template std::optional<std::vector<TStringValue>> Name::ExtractValues<TStringValue>(void);
+    template std::optional<std::vector<TBooleanValue>> Name::ExtractAll<TBooleanValue>(void);
+    template std::optional<std::vector<TIntegerValue>> Name::ExtractAll<TIntegerValue>(void);
+    template std::optional<std::vector<TStringValue>> Name::ExtractAll<TStringValue>(void);
 
-    std::optional<std::pair<std::wstring, Name>> Section::ExtractFirstName(void)
+    std::optional<std::pair<std::wstring, Name>> Section::ExtractFirst(void)
     {
       auto nameIterator = names.begin();
       if (names.end() == nameIterator) return std::nullopt;
 
       auto extractedName = names.extract(nameIterator);
       return std::make_pair(std::move(extractedName.key()), std::move(extractedName.mapped()));
-    }
-
-    template <typename ValueType> std::optional<ValueType> Section::ExtractFirstValue(
-        std::wstring_view name)
-    {
-      auto nameIterator = names.find(name);
-      if (names.end() == nameIterator) return std::nullopt;
-
-      if (false == nameIterator->second.TypeIs<ValueType>()) return std::nullopt;
-
-      if (1 == nameIterator->second.ValueCount())
-      {
-        auto extractedName = names.extract(nameIterator);
-        return extractedName.mapped().ExtractFirstValue<ValueType>();
-      }
-      else
-      {
-        return nameIterator->second.ExtractFirstValue<ValueType>();
-      }
-    }
-
-    template std::optional<TBooleanValue> Section::ExtractFirstValue(std::wstring_view);
-    template std::optional<TIntegerValue> Section::ExtractFirstValue(std::wstring_view);
-    template std::optional<TStringValue> Section::ExtractFirstValue(std::wstring_view);
-
-    template <typename ValueType> std::optional<std::vector<ValueType>> Section::ExtractValues(
-        std::wstring_view name)
-    {
-      auto nameIterator = names.find(name);
-      if (names.end() == nameIterator) return std::nullopt;
-
-      if (false == nameIterator->second.TypeIs<ValueType>()) return std::nullopt;
-
-      auto extractedName = names.extract(nameIterator);
-      return extractedName.mapped().ExtractValues<ValueType>().value();
-    }
-
-    template std::optional<std::vector<TBooleanValue>> Section::ExtractValues<TBooleanValue>(
-        std::wstring_view name);
-    template std::optional<std::vector<TIntegerValue>> Section::ExtractValues<TIntegerValue>(
-        std::wstring_view name);
-    template std::optional<std::vector<TStringValue>> Section::ExtractValues<TStringValue>(
-        std::wstring_view name);
-
-    std::optional<TBooleanView> Section::GetFirstBooleanValue(std::wstring_view name) const
-    {
-      const auto nameIter = names.find(name);
-      if (names.cend() == nameIter) return std::nullopt;
-
-      switch (nameIter->second.GetType())
-      {
-        case EValueType::Boolean:
-        case EValueType::BooleanMultiValue:
-          break;
-
-        default:
-          return std::nullopt;
-      }
-
-      return nameIter->second.GetFirstValue().GetBooleanValue();
-    }
-
-    std::optional<TIntegerView> Section::GetFirstIntegerValue(std::wstring_view name) const
-    {
-      const auto nameIter = names.find(name);
-      if (names.cend() == nameIter) return std::nullopt;
-
-      switch (nameIter->second.GetType())
-      {
-        case EValueType::Integer:
-        case EValueType::IntegerMultiValue:
-          break;
-
-        default:
-          return std::nullopt;
-      }
-
-      return nameIter->second.GetFirstValue().GetIntegerValue();
-    }
-
-    std::optional<TStringView> Section::GetFirstStringValue(std::wstring_view name) const
-    {
-      const auto nameIter = names.find(name);
-      if (names.cend() == nameIter) return std::nullopt;
-
-      switch (nameIter->second.GetType())
-      {
-        case EValueType::String:
-        case EValueType::StringMultiValue:
-          break;
-
-        default:
-          return std::nullopt;
-      }
-
-      return nameIter->second.GetFirstValue().GetStringValue();
     }
 
     std::pair<std::wstring, Section> ConfigurationData::ExtractSection(
@@ -694,26 +807,24 @@ namespace Infra
           std::move(extractedSection.key()), std::move(extractedSection.mapped()));
     }
 
-    std::optional<std::pair<std::wstring, Section>> ConfigurationData::ExtractSection(
-        std::wstring_view section)
+    void ConfigurationFileReader::AppendErrorMessage(std::wstring_view errorMessage)
     {
-      auto sectionIterator = sections.find(section);
-      if (sections.end() == sectionIterator) return std::nullopt;
-
-      return ExtractSection(sectionIterator);
+      if (false == errorMessages.has_value()) errorMessages.emplace();
+      errorMessages->emplace_back(errorMessage);
     }
 
     ConfigurationData ConfigurationFileReader::ReadConfigurationFile(
         std::wstring_view configFileName, bool mustExist)
     {
+      errorMessages.reset();
+
       FileHandle configFileHandle(configFileName.data(), L"r");
       if (nullptr == configFileHandle)
       {
         ConfigurationData configDataFromNonExistentFile;
 
         if (true == mustExist)
-          configDataFromNonExistentFile.InsertReadErrorMessage(
-              Strings::Format(L"%s: Unable to open file.", configFileName.data()));
+          AppendErrorMessage(Strings::Format(L"%s: Unable to open file.", configFileName.data()));
 
         return configDataFromNonExistentFile;
       }
@@ -724,6 +835,8 @@ namespace Infra
     ConfigurationData ConfigurationFileReader::ReadInMemoryConfigurationFile(
         std::wstring_view configBuffer)
     {
+      errorMessages.reset();
+
       MemoryBufferHandle configBufferHandle(configBuffer);
       return ReadConfiguration(
           configBufferHandle,
@@ -755,7 +868,7 @@ namespace Infra
         switch (ClassifyConfigurationFileLine(configLineBuffer.Data(), configLineLength))
         {
           case ELineClassification::Error:
-            configToFill.InsertReadErrorMessage(Strings::Format(
+            AppendErrorMessage(Strings::Format(
                 L"%s(%d): Unable to parse line.", configSourceName.data(), configLineNumber));
             break;
 
@@ -768,7 +881,7 @@ namespace Infra
 
             if (0 != seenSections.count(section))
             {
-              configToFill.InsertReadErrorMessage(Strings::Format(
+              AppendErrorMessage(Strings::Format(
                   L"%s(%d): %s: Duplicated section name.",
                   configSourceName.data(),
                   configLineNumber,
@@ -777,18 +890,18 @@ namespace Infra
               break;
             }
 
-            const EAction sectionAction = ActionForSection(section);
-            switch (sectionAction)
+            const Action sectionAction = ActionForSection(section);
+            switch (sectionAction.GetAction())
             {
               case EAction::Error:
-                if (true == HasLastErrorMessage())
-                  configToFill.InsertReadErrorMessage(Strings::Format(
+                if (true == sectionAction.HasErrorMessage())
+                  AppendErrorMessage(Strings::Format(
                       L"%s(%d): %s",
                       configSourceName.data(),
                       configLineNumber,
-                      GetLastErrorMessage().c_str()));
+                      sectionAction.GetErrorMessage().c_str()));
                 else
-                  configToFill.InsertReadErrorMessage(Strings::Format(
+                  AppendErrorMessage(Strings::Format(
                       L"%s(%d): %s: Unrecognized section name.",
                       configSourceName.data(),
                       configLineNumber,
@@ -806,7 +919,7 @@ namespace Infra
                 break;
 
               default:
-                configToFill.InsertReadErrorMessage(Strings::Format(
+                AppendErrorMessage(Strings::Format(
                     L"%s(%d): Internal error while processing section name.",
                     configSourceName.data(),
                     configLineNumber));
@@ -823,7 +936,10 @@ namespace Infra
               std::wstring_view value;
               ParseNameAndValue(configLineBuffer.Data(), name, value);
 
-              const EValueType valueType = TypeForValue(thisSection, name);
+              const auto& existingName = configToFill[thisSection][name];
+              const EValueType valueType =
+                  (existingName.HasValue() ? existingName.GetType()
+                                           : TypeForValue(thisSection, name));
               bool shouldParseValue = true;
 
               // If the value type does not identify it as multi-valued, make sure
@@ -833,9 +949,9 @@ namespace Infra
                 case EValueType::Integer:
                 case EValueType::Boolean:
                 case EValueType::String:
-                  if (configToFill.SectionNamePairExists(thisSection, name))
+                  if (configToFill.Contains(thisSection, name))
                   {
-                    configToFill.InsertReadErrorMessage(Strings::Format(
+                    AppendErrorMessage(Strings::Format(
                         L"%s(%d): %s: Only a single value is allowed for this setting.",
                         configSourceName.data(),
                         configLineNumber,
@@ -854,7 +970,7 @@ namespace Infra
               switch (valueType)
               {
                 case EValueType::Error:
-                  configToFill.InsertReadErrorMessage(Strings::Format(
+                  AppendErrorMessage(Strings::Format(
                       L"%s(%d): %s: Unrecognized configuration setting.",
                       configSourceName.data(),
                       configLineNumber,
@@ -868,7 +984,7 @@ namespace Infra
 
                   if (false == ParseInteger(value, intValue))
                   {
-                    configToFill.InsertReadErrorMessage(Strings::Format(
+                    AppendErrorMessage(Strings::Format(
                         L"%s(%d): %s: Failed to parse integer value.",
                         configSourceName.data(),
                         configLineNumber,
@@ -876,17 +992,18 @@ namespace Infra
                     break;
                   }
 
-                  switch (ActionForValue(thisSection, name, intValue))
+                  const Action valueAction = ActionForValue(thisSection, name, intValue);
+                  switch (valueAction.GetAction())
                   {
                     case EAction::Error:
-                      if (true == HasLastErrorMessage())
-                        configToFill.InsertReadErrorMessage(Strings::Format(
+                      if (true == valueAction.HasErrorMessage())
+                        AppendErrorMessage(Strings::Format(
                             L"%s(%d): %s",
                             configSourceName.data(),
                             configLineNumber,
-                            GetLastErrorMessage().c_str()));
+                            valueAction.GetErrorMessage().c_str()));
                       else
-                        configToFill.InsertReadErrorMessage(Strings::Format(
+                        AppendErrorMessage(Strings::Format(
                             L"%s(%d): %s: Invalid value for configuration setting %s.",
                             configSourceName.data(),
                             configLineNumber,
@@ -896,9 +1013,15 @@ namespace Infra
 
                     case EAction::Process:
                       if (false ==
-                          configToFill.InsertValue(
-                              thisSection, name, Value(TIntegerValue(intValue), configLineNumber)))
-                        configToFill.InsertReadErrorMessage(Strings::Format(
+                          configToFill.Insert(
+                              thisSection,
+                              name,
+                              Value(
+                                  TIntegerValue(intValue),
+                                  valueType,
+                                  configSourceName,
+                                  configLineNumber)))
+                        AppendErrorMessage(Strings::Format(
                             L"%s(%d): %s: Duplicated value for configuration setting %s.",
                             configSourceName.data(),
                             configLineNumber,
@@ -916,7 +1039,7 @@ namespace Infra
 
                   if (false == ParseBoolean(value, boolValue))
                   {
-                    configToFill.InsertReadErrorMessage(Strings::Format(
+                    AppendErrorMessage(Strings::Format(
                         L"%s(%d): %s: Failed to parse Boolean value.",
                         configSourceName.data(),
                         configLineNumber,
@@ -924,17 +1047,18 @@ namespace Infra
                     break;
                   }
 
-                  switch (ActionForValue(thisSection, name, boolValue))
+                  const Action valueAction = ActionForValue(thisSection, name, boolValue);
+                  switch (valueAction.GetAction())
                   {
                     case EAction::Error:
-                      if (true == HasLastErrorMessage())
-                        configToFill.InsertReadErrorMessage(Strings::Format(
+                      if (true == valueAction.HasErrorMessage())
+                        AppendErrorMessage(Strings::Format(
                             L"%s(%d): %s",
                             configSourceName.data(),
                             configLineNumber,
-                            GetLastErrorMessage().c_str()));
+                            valueAction.GetErrorMessage().c_str()));
                       else
-                        configToFill.InsertReadErrorMessage(Strings::Format(
+                        AppendErrorMessage(Strings::Format(
                             L"%s(%d): %s: Invalid value for configuration setting %s.",
                             configSourceName.data(),
                             configLineNumber,
@@ -944,9 +1068,15 @@ namespace Infra
 
                     case EAction::Process:
                       if (false ==
-                          configToFill.InsertValue(
-                              thisSection, name, Value(TBooleanValue(boolValue), configLineNumber)))
-                        configToFill.InsertReadErrorMessage(Strings::Format(
+                          configToFill.Insert(
+                              thisSection,
+                              name,
+                              Value(
+                                  TBooleanValue(boolValue),
+                                  valueType,
+                                  configSourceName,
+                                  configLineNumber)))
+                        AppendErrorMessage(Strings::Format(
                             L"%s(%d): %s: Duplicated value for configuration setting %s.",
                             configSourceName.data(),
                             configLineNumber,
@@ -960,17 +1090,18 @@ namespace Infra
                 case EValueType::String:
                 case EValueType::StringMultiValue:
                 {
-                  switch (ActionForValue(thisSection, name, value))
+                  const Action valueAction = ActionForValue(thisSection, name, value);
+                  switch (valueAction.GetAction())
                   {
                     case EAction::Error:
-                      if (true == HasLastErrorMessage())
-                        configToFill.InsertReadErrorMessage(Strings::Format(
+                      if (true == valueAction.HasErrorMessage())
+                        AppendErrorMessage(Strings::Format(
                             L"%s(%d): %s",
                             configSourceName.data(),
                             configLineNumber,
-                            GetLastErrorMessage().c_str()));
+                            valueAction.GetErrorMessage().c_str()));
                       else
-                        configToFill.InsertReadErrorMessage(Strings::Format(
+                        AppendErrorMessage(Strings::Format(
                             L"%s(%d): %s: Invalid value for configuration setting %s.",
                             configSourceName.data(),
                             configLineNumber,
@@ -980,9 +1111,15 @@ namespace Infra
 
                     case EAction::Process:
                       if (false ==
-                          configToFill.InsertValue(
-                              thisSection, name, Value(TStringValue(value), configLineNumber)))
-                        configToFill.InsertReadErrorMessage(Strings::Format(
+                          configToFill.Insert(
+                              thisSection,
+                              name,
+                              Value(
+                                  TStringValue(value),
+                                  valueType,
+                                  configSourceName,
+                                  configLineNumber)))
+                        AppendErrorMessage(Strings::Format(
                             L"%s(%d): %s: Duplicated value for configuration setting %s.",
                             configSourceName.data(),
                             configLineNumber,
@@ -994,7 +1131,7 @@ namespace Infra
                 }
 
                 default:
-                  configToFill.InsertReadErrorMessage(Strings::Format(
+                  AppendErrorMessage(Strings::Format(
                       L"%s(%d): Internal error while processing configuration setting.",
                       configSourceName.data(),
                       configLineNumber));
@@ -1004,7 +1141,7 @@ namespace Infra
             break;
 
           default:
-            configToFill.InsertReadErrorMessage(Strings::Format(
+            AppendErrorMessage(Strings::Format(
                 L"%s(%d): Internal error while processing line.",
                 configSourceName.data(),
                 configLineNumber));
@@ -1023,13 +1160,13 @@ namespace Infra
 
         if (readHandle.IsError())
         {
-          configToFill.InsertReadErrorMessage(Strings::Format(
+          AppendErrorMessage(Strings::Format(
               L"%s(%d): I/O error while reading.", configSourceName.data(), configLineNumber));
           return configToFill;
         }
         else if (configLineLength < 0)
         {
-          configToFill.InsertReadErrorMessage(Strings::Format(
+          AppendErrorMessage(Strings::Format(
               L"%s(%d): Line is too long.", configSourceName.data(), configLineNumber));
           return configToFill;
         }
@@ -1040,16 +1177,16 @@ namespace Infra
       return configToFill;
     }
 
-    TemporaryString ConfigurationData::ToConfigurationFileString(void) const
+    std::wstring ConfigurationData::ToConfigurationFileString(void) const
     {
-      TemporaryString configurationFileString;
+      std::wstringstream configurationFileStringStream;
 
       for (const auto& sectionRecord : sections)
       {
         std::wstring_view section = sectionRecord.first;
 
         if (false == section.empty())
-          configurationFileString << L'[' << sectionRecord.first << L']' << L'\n';
+          configurationFileStringStream << L'[' << sectionRecord.first << L']' << L'\n';
 
         for (const auto& nameRecord : sectionRecord.second.Names())
         {
@@ -1061,24 +1198,27 @@ namespace Infra
             {
               case EValueType::Integer:
               case EValueType::IntegerMultiValue:
-                configurationFileString << name << L" = " << valueRecord.GetIntegerValue() << L'\n';
+                configurationFileStringStream << name << L" = " << valueRecord.GetInteger()
+                                              << L'\n';
                 break;
 
               case EValueType::Boolean:
               case EValueType::BooleanMultiValue:
-                configurationFileString << name << L" = " << valueRecord.GetBooleanValue() << L'\n';
+                configurationFileStringStream
+                    << name << L" = " << ((true == valueRecord.GetBoolean()) ? L"yes" : L"no")
+                    << L'\n';
                 break;
 
               case EValueType::String:
               case EValueType::StringMultiValue:
-                configurationFileString << name << L" = " << valueRecord.GetStringValue() << L'\n';
+                configurationFileStringStream << name << L" = " << valueRecord.GetString() << L'\n';
                 break;
             }
           }
         }
       }
 
-      return configurationFileString;
+      return configurationFileStringStream.str();
     }
 
     void ConfigurationFileReader::BeginRead(void) {}
