@@ -860,7 +860,7 @@ namespace Infra
       BeginRead();
 
       // Parse the configuration file, one line at a time.
-      std::set<std::wstring, std::less<>> seenSections;
+      std::set<std::wstring, Strings::CaseInsensitiveLessThanComparator<wchar_t>> seenSections;
       std::wstring_view thisSection = kSectionNameGlobal;
 
       int configLineNumber = 1;

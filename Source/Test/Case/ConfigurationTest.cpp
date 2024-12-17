@@ -14,6 +14,7 @@
 #include <functional>
 #include <optional>
 
+#include "Core/Strings.h"
 #include "Core/TemporaryBuffer.h"
 #include "Test/TestCase.h"
 
@@ -774,7 +775,8 @@ namespace CoreInfraTest
         L"Value = cc\n"
         L"Value = dd\n"
         L"Value = ee\n";
-    std::set<std::wstring, std::less<>> seenTypeForValueQueries;
+    std::set<std::wstring, Infra::Strings::CaseInsensitiveLessThanComparator<wchar_t>>
+        seenTypeForValueQueries;
     TestConfigurationFileReader testConfigReader(
         [&seenTypeForValueQueries](
             std::wstring_view section, std::wstring_view name) -> std::optional<EValueType>
@@ -852,5 +854,39 @@ namespace CoreInfraTest
     // Actual string values themselves are case sensitive.
     TEST_ASSERT(L"This is a test string." == actualConfigData[L"Section1"][L"Stringvalue"]);
     TEST_ASSERT(L"THIS IS A TEST STRING." != actualConfigData[L"Section1"][L"Stringvalue"]);
+  }
+
+  // Verifies that duplicate sections and values are detected even when the case is different. This
+  // should result in error messages after the configuration file is finished being read.
+  TEST_CASE(Configuration_ConfigurationFileReader_CaseInsensitiveDuplicateChecks)
+  {
+    constexpr std::wstring_view kTestConfigFile =
+        L"[Section1]\n"
+        L"Integervalue = 1\n"
+        L"IntegerVALUE = 2\n" // Error: Duplicate setting name should be caught.
+        L"[Section2]\n"
+        L"StringValue = This is a test string.\n"
+        L"[secTION1]\n" // Error: Duplicate section name should be caught.
+        L"Booleanvalue = false\n"
+        L"BooleanVALUE = TRUE\n"; // Error not reported because "secTION1" should be skipped.
+    TestConfigurationFileReader testConfigReader;
+    const ConfigurationData configData =
+        testConfigReader.ReadInMemoryConfigurationFile(kTestConfigFile);
+    TEST_ASSERT(true == testConfigReader.HasErrorMessages());
+    TEST_ASSERT(2 == testConfigReader.GetErrorMessages().size());
+
+    // One of the error messages should be about a duplicated section name and one about a
+    // duplicated integer value.
+    bool duplicatedSectionNameErrorMessageFound = false;
+    bool duplicatedIntegerValueErrorMessageFound = false;
+    for (const auto& errorMessage : testConfigReader.GetErrorMessages())
+    {
+      if (errorMessage.contains(L"secTION1"))
+        duplicatedSectionNameErrorMessageFound = true;
+      else if (errorMessage.contains(L"IntegerVALUE"))
+        duplicatedIntegerValueErrorMessageFound = true;
+    }
+    TEST_ASSERT(true == duplicatedSectionNameErrorMessageFound);
+    TEST_ASSERT(true == duplicatedIntegerValueErrorMessageFound);
   }
 } // namespace CoreInfraTest
