@@ -473,6 +473,20 @@ namespace CoreInfraTest
     TEST_ASSERT(2 == testConfigSection[L"TestSetting"].Count());
   }
 
+  // Verifies that extraction of a contained setting occurs correctly and uses move
+  // semantics.
+  TEST_CASE(Configuration_Section_Extract)
+  {
+    Section testConfigSection({{L"TestSetting", L"Nice long test configuration setting string."}});
+    const auto expectedBufferPointer = testConfigSection[L"TestSetting"]->GetString().data();
+
+    const auto extractedConfigName = testConfigSection.Extract(L"TestSetting");
+    TEST_ASSERT(true == extractedConfigName.has_value());
+
+    const auto actualBufferPointer = extractedConfigName->GetFirst().GetString().data();
+    TEST_ASSERT(actualBufferPointer == expectedBufferPointer);
+  }
+
   // Verifies that extraction of the first contained setting occurs correctly and uses move
   // semantics.
   TEST_CASE(Configuration_Section_ExtractFirst)

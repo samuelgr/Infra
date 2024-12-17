@@ -787,6 +787,15 @@ namespace Infra
     template std::optional<std::vector<TIntegerValue>> Name::ExtractAll<TIntegerValue>(void);
     template std::optional<std::vector<TStringValue>> Name::ExtractAll<TStringValue>(void);
 
+    std::optional<Name> Section::Extract(std::wstring_view name)
+    {
+      auto nameIterator = names.find(name);
+      if (names.end() == nameIterator) return std::nullopt;
+
+      auto extractedName = names.extract(nameIterator);
+      return std::move(extractedName.mapped());
+    }
+
     std::optional<std::pair<std::wstring, Name>> Section::ExtractFirst(void)
     {
       auto nameIterator = names.begin();

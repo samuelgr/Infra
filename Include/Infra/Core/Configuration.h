@@ -500,7 +500,6 @@ namespace Infra
 
       /// Extracts the first Boolean value from this configuration setting using move
       /// semantics.
-      /// @param [in] name Name of the configuration setting to extract.
       /// @return Extracted value if the value is of type Boolean.
       inline std::optional<TBooleanValue> ExtractFirstBoolean(void)
       {
@@ -509,7 +508,6 @@ namespace Infra
 
       /// Extracts the first integer value from this configuration setting using move
       /// semantics.
-      /// @param [in] name Name of the configuration setting to extract.
       /// @return Extracted value if the value is of type integer.
       inline std::optional<TIntegerValue> ExtractFirstInteger(void)
       {
@@ -518,7 +516,6 @@ namespace Infra
 
       /// Extracts the first string value from this configuration setting using move
       /// semantics.
-      /// @param [in] name Name of the configuration setting to extract.
       /// @return Extracted value if the value is of type string.
       inline std::optional<TStringValue> ExtractFirstString(void)
       {
@@ -736,6 +733,13 @@ namespace Infra
       {
         return names.size();
       }
+
+      /// Extracts the entire configuration setting of the specified name from this section using
+      /// move semantics.
+      /// @param [in] name Name of the configuration setting to extract.
+      /// @return Extracted configuration setting, including all its values, if a setting of the
+      /// specified name exists in this section.
+      std::optional<Name> Extract(std::wstring_view name);
 
       /// Extracts the entire first configuration setting from this section using move
       /// semantics.
