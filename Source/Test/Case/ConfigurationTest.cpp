@@ -805,4 +805,52 @@ namespace CoreInfraTest
     TEST_ASSERT(false == testConfigReader.HasErrorMessages());
   }
 
+  // Verifies that section and setting names are treated as case-insensitive, both when a
+  // configuration file is read and when it is subsequently queried. The actual input case should
+  // still be preserved in the configuration data object, but case is not considered for finding
+  // settings.
+  TEST_CASE(Configuration_ConfigurationFileReader_CasePreservedButInsensitive)
+  {
+    constexpr std::wstring_view kTestConfigFile =
+        L"[Section1]\n"
+        L"Integervalue = 1\n"
+        L"Booleanvalue = FALSE\n"
+        L"Stringvalue = This is a test string.\n"
+        L"[secTION2]\n"
+        L"IntegerVALUE = 2\n"
+        L"BooleanVALUE = trUE\n"
+        L"StringVALUE = This is a test string 2.\n";
+    TestConfigurationFileReader testConfigReader;
+
+    // Case is preserved in the configuration data structure, so an equality comparison is
+    // case-sensitive.
+    const ConfigurationData expectedConfigData(
+        {{L"Section1",
+          Section(
+              {{L"Integervalue", 1},
+               {L"Booleanvalue", false},
+               {L"Stringvalue", L"This is a test string."}})},
+         {L"secTION2",
+          Section(
+              {{L"IntegerVALUE", 2},
+               {L"BooleanVALUE", true},
+               {L"StringVALUE", L"This is a test string 2."}})}});
+    const ConfigurationData actualConfigData =
+        testConfigReader.ReadInMemoryConfigurationFile(kTestConfigFile);
+    TEST_ASSERT(actualConfigData == expectedConfigData);
+
+    // Lookups are case-insensitive, so regardless of case the values should be accessible.
+    TEST_ASSERT(1 == actualConfigData[L"SECTION1"][L"INTEGERVALUE"].ValueOr(0));
+    TEST_ASSERT(false == actualConfigData[L"SECTION1"][L"BOOLEANVALUE"].ValueOr(true));
+    TEST_ASSERT(
+        L"This is a test string." == actualConfigData[L"section1"][L"stringvalue"].ValueOr(L""));
+    TEST_ASSERT(2 == actualConfigData[L"SECtion2"][L"integerVALUE"].ValueOr(0));
+    TEST_ASSERT(true == actualConfigData[L"secTION2"][L"BooleanVALUE"].ValueOr(false));
+    TEST_ASSERT(
+        L"This is a test string 2." == actualConfigData[L"section2"][L"stringvalue"].ValueOr(L""));
+
+    // Actual string values themselves are case sensitive.
+    TEST_ASSERT(L"This is a test string." == actualConfigData[L"Section1"][L"Stringvalue"]);
+    TEST_ASSERT(L"THIS IS A TEST STRING." != actualConfigData[L"Section1"][L"Stringvalue"]);
+  }
 } // namespace CoreInfraTest

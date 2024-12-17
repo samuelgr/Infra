@@ -23,6 +23,7 @@
 #include <vector>
 
 #include "DebugAssert.h"
+#include "Strings.h"
 
 /// Convenience wrapper around initializer list syntax for defining a configuration file section in
 /// a layout object. Specify a section name followed by a series of setting name and value type
@@ -203,7 +204,7 @@ namespace Infra
         std::is_convertible_v<MaybeStringType, TStringView>;
 
     /// Fourth-level object used to represent a single configuration value for a particular
-    /// configuration setting.
+    /// configuration setting. String values are case-sensitive.
     class Value
     {
     public:
@@ -419,7 +420,7 @@ namespace Infra
     public:
 
       /// Alias for the underlying data structure used to store per-setting configuration
-      /// values.
+      /// values. Comparisons are delegated to whatever the #Value class supports.
       using TValues = std::set<Value, std::less<>>;
 
       Name(void) = default;
@@ -692,8 +693,9 @@ namespace Infra
     class Section
     {
       /// Alias for the underlying data structure used to store per-section configuration
-      /// settings.
-      using TNames = std::map<std::wstring, Name, std::less<>>;
+      /// settings. Names of configuration settings are case-insensitive.
+      using TNames =
+          std::map<std::wstring, Name, Strings::CaseInsensitiveLessThanComparator<wchar_t>>;
 
     public:
 
@@ -796,8 +798,9 @@ namespace Infra
     public:
 
       /// Alias for the underlying data structure used to store top-level configuration
-      /// section data.
-      using TSections = std::map<std::wstring, Section, std::less<>>;
+      /// section data. Names of sections are case-insensitive.
+      using TSections =
+          std::map<std::wstring, Section, Strings::CaseInsensitiveLessThanComparator<wchar_t>>;
 
       ConfigurationData(void) = default;
 
@@ -1073,12 +1076,16 @@ namespace Infra
 
     /// Type alias for a suggested format for storing the supported layout of a section within a
     /// configuration file. Useful for pre-determining what is allowed to appear within one
-    /// section of a configuration file.
-    using TConfigurationFileSectionLayout = std::map<std::wstring_view, EValueType, std::less<>>;
+    /// section of a configuration file. Names of configuration settings are case-insensitive.
+    using TConfigurationFileSectionLayout = std::
+        map<std::wstring_view, EValueType, Strings::CaseInsensitiveLessThanComparator<wchar_t>>;
 
     /// Type alias for a suggested format for storing the supported layout of a configuration
     /// file. Useful for pre-determining what is allowed to appear within a configuration file.
-    using TConfigurationFileLayout =
-        std::map<std::wstring_view, TConfigurationFileSectionLayout, std::less<>>;
+    /// Names of sections are case-insensitive.
+    using TConfigurationFileLayout = std::map<
+        std::wstring_view,
+        TConfigurationFileSectionLayout,
+        Strings::CaseInsensitiveLessThanComparator<wchar_t>>;
   } // namespace Configuration
 } // namespace Infra
