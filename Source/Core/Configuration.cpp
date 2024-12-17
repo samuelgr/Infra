@@ -130,7 +130,7 @@ namespace Infra
     /// before the '=' sign in the configuration file).
     /// @param [in] charToTest Character to test.
     /// @return `true` if so, `false` if not.
-    static bool IsAllowedNameCharacter(const wchar_t charToTest)
+    static bool IsAllowedNameCharacter(wchar_t charToTest)
     {
       switch (charToTest)
       {
@@ -148,7 +148,7 @@ namespace Infra
     /// brackets in the configuration file).
     /// @param [in] charToTest Character to test.
     /// @return `true` if so, `false` if not.
-    static bool IsAllowedSectionCharacter(const wchar_t charToTest)
+    static bool IsAllowedSectionCharacter(wchar_t charToTest)
     {
       switch (charToTest)
       {
@@ -185,7 +185,7 @@ namespace Infra
     /// after the '=' sign in the configuration file).
     /// @param [in] charToTest Character to test.
     /// @return `true` if so, `false` if not.
-    static bool IsAllowedValueCharacter(const wchar_t charToTest)
+    static bool IsAllowedValueCharacter(wchar_t charToTest)
     {
       switch (charToTest)
       {
@@ -227,80 +227,68 @@ namespace Infra
     /// @param [in] buf Buffer containing the configuration file line.
     /// @param [in] length Number of characters in the buffer.
     /// @return Configuration line classification.
-    static ELineClassification ClassifyConfigurationFileLine(
-        const wchar_t* const buf, const int length)
+    static ELineClassification ClassifyConfigurationFileLine(std::wstring_view configLine)
     {
       // Skip over all whitespace at the start of the input line.
-      const wchar_t* realBuf = buf;
-      int realLength = length;
-      while (realLength != 0 && iswblank(realBuf[0]))
-      {
-        realLength -= 1;
-        realBuf += 1;
-      }
+      while ((false == configLine.empty()) && (iswblank(configLine.front())))
+        configLine.remove_prefix(1);
 
       // Sanity check: zero-length and all-whitespace lines can be safely ignored.
       // Also filter out comments this way.
-      if (0 == realLength || L';' == realBuf[0] || L'#' == realBuf[0])
+      if (0 == configLine.length() || L';' == configLine.front() || L'#' == configLine.front())
         return ELineClassification::Ignore;
 
       // Non-comments must, by definition, have at least three characters in them, excluding
       // all whitespace. For section headers, this must mean '[' + section name + ']'. For
       // values, this must mean name + '=' + value.
-      if (realLength < 3) return ELineClassification::Error;
+      if (configLine.length() < 3) return ELineClassification::Error;
 
-      if (L'[' == realBuf[0])
+      if (L'[' == configLine[0])
       {
         // The line cannot be a section header unless the second character is a valid
         // section name character.
-        if (!IsAllowedSectionCharacter(realBuf[1])) return ELineClassification::Error;
+        if (!IsAllowedSectionCharacter(configLine[1])) return ELineClassification::Error;
 
         // Verify that the line is a valid section header by checking for valid section name
         // characters between two square brackets.
-        int i = 2;
-        for (; i < realLength && L']' != realBuf[i]; ++i)
-        {
-          if (!IsAllowedSectionCharacter(realBuf[i])) return ELineClassification::Error;
-        }
-        if (L']' != realBuf[i]) return ELineClassification::Error;
+        size_t i = 2;
+        for (; i < configLine.length() && L']' != configLine[i]; ++i)
+          if (!IsAllowedSectionCharacter(configLine[i])) return ELineClassification::Error;
+        if (L']' != configLine[i]) return ELineClassification::Error;
 
         // Verify that the remainder of the line is just whitespace.
-        for (i += 1; i < realLength; ++i)
-        {
-          if (!iswblank(realBuf[i])) return ELineClassification::Error;
-        }
+        for (i += 1; i < configLine.length(); ++i)
+          if (!iswblank(configLine[i])) return ELineClassification::Error;
 
         return ELineClassification::Section;
       }
-      else if (IsAllowedNameCharacter(realBuf[0]))
+      else if (IsAllowedNameCharacter(configLine[0]))
       {
         // Search for whitespace or an equals sign, with all characters in between needing
         // to be allowed as value name characters.
-        int i = 1;
-        for (; i < realLength && L'=' != realBuf[i] && !iswblank(realBuf[i]); ++i)
-        {
-          if (!IsAllowedNameCharacter(realBuf[i])) return ELineClassification::Error;
-        }
+        size_t i = 1;
+        for (; i < configLine.length() && L'=' != configLine[i] && !iswblank(configLine[i]); ++i)
+          if (!IsAllowedNameCharacter(configLine[i])) return ELineClassification::Error;
 
         // Skip over any whitespace present, then check for an equals sign.
-        for (; i < realLength && iswblank(realBuf[i]); ++i)
+        for (; i < configLine.length() && iswblank(configLine[i]); ++i)
           ;
-        if (L'=' != realBuf[i]) return ELineClassification::Error;
+        if (L'=' != configLine[i]) return ELineClassification::Error;
 
         // Skip over any whitespace present, then verify the next character is allowed to
         // start a value setting.
-        for (i += 1; i < realLength && iswblank(realBuf[i]); ++i)
+        for (i += 1; i < configLine.length() && iswblank(configLine[i]); ++i)
           ;
-        if (!IsAllowedValueCharacter(realBuf[i])) return ELineClassification::Error;
+        if (!IsAllowedValueCharacter(configLine[i])) return ELineClassification::Error;
 
         // Skip over the value setting characters that follow.
-        for (i += 1; i < realLength && IsAllowedValueCharacter(realBuf[i]); ++i)
+        for (i += 1; i < configLine.length() && IsAllowedValueCharacter(configLine[i]); ++i)
           ;
 
         // Verify that the remainder of the line is just whitespace.
-        for (; i < realLength; ++i)
+        for (; i < configLine.length(); ++i)
         {
-          if (!iswblank(realBuf[i])) return ELineClassification::Error;
+          if (!iswblank(configLine[i])) return ELineClassification::Error;
         }
 
         return ELineClassification::Value;
@@ -379,37 +367,21 @@ namespace Infra
     /// @param [out] nameString Filled with the name of the configuration setting.
     /// @param [out] valueString Filled with the value specified for the configuration setting.
     static void ParseNameAndValue(
-        wchar_t* configFileLine, std::wstring_view& nameString, std::wstring_view& valueString)
+        std::wstring_view configLine, std::wstring_view& nameString, std::wstring_view& valueString)
     {
-      // Skip to the start of the name part of the line.
-      wchar_t* name = configFileLine;
-      while (iswblank(name[0]))
-        name += 1;
+      const size_t equalSignPosition = configLine.find_first_of(L'=');
 
-      // Find the length of the configuration name.
-      int nameLength = 1;
-      while (IsAllowedNameCharacter(name[nameLength]))
-        nameLength += 1;
+      nameString = configLine.substr(0, equalSignPosition);
+      while (iswblank(nameString.front()))
+        nameString.remove_prefix(1);
+      while (iswblank(nameString.back()))
+        nameString.remove_suffix(1);
 
-      // Advance to the value portion of the string.
-      wchar_t* value = &name[nameLength + 1];
-
-      // Skip over whitespace and the '=' sign.
-      while ((L'=' == value[0]) || (iswblank(value[0])))
-        value += 1;
-
-      // Find the length of the configuration value.
-      int valueLength = 1;
-      while (IsAllowedValueCharacter(value[valueLength]))
-        valueLength += 1;
-
-      // Null-terminate both name and value strings so the resulting views are also
-      // null-terminated.
-      name[nameLength] = L'\0';
-      value[valueLength] = L'\0';
-
-      nameString = std::wstring_view(name, nameLength);
-      valueString = std::wstring_view(value, valueLength);
+      valueString = configLine.substr(1 + equalSignPosition);
+      while (iswblank(valueString.front()))
+        valueString.remove_prefix(1);
+      while (iswblank(valueString.back()))
+        valueString.remove_suffix(1);
     }
 
     /// Parses a section name from the specified configuration file line, which must first have
@@ -417,23 +389,12 @@ namespace Infra
     /// modified to add null termination such that the view is guaranteed to be null-terminated.
     /// @param [in] configFileLine Buffer containing the configuration file line.
     /// @param String containing the name of the configuration section.
-    static std::wstring_view ParseSection(wchar_t* configFileLine)
+    static std::wstring_view ParseSection(std::wstring_view configLine)
     {
-      // Skip to the '[' character and then advance once more to the section name itself.
-      wchar_t* section = configFileLine;
-      while (L'[' != section[0])
-        section += 1;
-      section += 1;
-
-      // Find the length of the section name.
-      int sectionLength = 1;
-      while (L']' != section[sectionLength])
-        sectionLength += 1;
-
-      // Null-terminate the section name so the resulting view is also null-terminated.
-      section[sectionLength] = L'\0';
-
-      return std::wstring_view(section, sectionLength);
+      std::wstring_view parsedSection = configLine;
+      parsedSection.remove_prefix(1 + configLine.find_first_of(L'['));
+      parsedSection.remove_suffix(configLine.length() - configLine.find_first_of(L']'));
+      return parsedSection;
     }
 
     /// Reads a single line from the specified handle, verifies that it fits within the
@@ -445,8 +406,8 @@ namespace Infra
     /// @param [out] lineBuffer Filled with text read from the specified file.
     /// @param [in] lineBufferCount Length, in character units, of the line buffer.
     /// @return Length of the string that was read, with -1 indicating an error condition.
-    template <typename ReadHandleType> static int ReadAndTrimLine(
-        ReadHandleType& readHandle, wchar_t* const lineBuffer, const int lineBufferCount)
+    template <typename ReadHandleType> static bool ReadAndTrimLine(
+        ReadHandleType& readHandle, TemporaryString& configLine)
     {
       return -1;
     }
@@ -458,26 +419,19 @@ namespace Infra
     /// @param [out] lineBuffer Filled with text read from the specified file.
     /// @param [in] lineBufferCount Length, in character units, of the line buffer.
     /// @return Length of the string that was read, with -1 indicating an error condition.
-    template <> static int ReadAndTrimLine<FileHandle>(
-        FileHandle& fileHandle, wchar_t* const lineBuffer, const int lineBufferCount)
+    template <> static bool ReadAndTrimLine<FileHandle>(
+        FileHandle& fileHandle, TemporaryString& configLine)
     {
       // Results in a null-terminated string guaranteed, but might not be the whole line if
       // the buffer is too small.
-      if (lineBuffer != fgetws(lineBuffer, lineBufferCount, fileHandle)) return -1;
+      if (configLine.Data() != fgetws(configLine.Data(), configLine.Capacity(), fileHandle))
+        return false;
+      configLine.UnsafeSetSize(
+          static_cast<unsigned int>(wcsnlen(configLine.Data(), configLine.Capacity())));
 
-      // If the line fits in the buffer, then either its detected length is small by
-      // comparison to the buffer size or, if it perfectly fits in the buffer, then the last
-      // character is a newline.
-      int lineLength = static_cast<int>(wcsnlen(lineBuffer, lineBufferCount));
-      if (((lineBufferCount - 1) == lineLength) && (L'\n' != lineBuffer[lineLength - 1])) return -1;
-
-      // Trim off any whitespace on the end of the line.
-      while (iswspace(lineBuffer[lineLength - 1]))
-        lineLength -= 1;
-
-      lineBuffer[lineLength] = L'\0';
-
-      return lineLength;
+      while (iswspace(configLine.Back()))
+        configLine.RemoveSuffix(1);
+      return true;
     }
 
     /// Reads a single line from the specified in-memory configuration file data, verifies that
@@ -487,34 +441,30 @@ namespace Infra
     /// @param [out] lineBuffer Filled with text read from the specified file.
     /// @param [in] lineBufferCount Length, in character units, of the line buffer.
     /// @return Length of the string that was read, with -1 indicating an error condition.
-    template <> static int ReadAndTrimLine<MemoryBufferHandle>(
-        MemoryBufferHandle& memoryBufferHandle,
-        wchar_t* const lineBuffer,
-        const int lineBufferCount)
+    template <> static bool ReadAndTrimLine<MemoryBufferHandle>(
+        MemoryBufferHandle& memoryBufferHandle, TemporaryString& configLine)
     {
-      if (memoryBufferHandle.IsEndOfInput()) return -1;
+      if (memoryBufferHandle.IsEndOfInput()) return false;
 
-      int nextLineLength =
-          static_cast<int>(memoryBufferHandle.remainingBuffer.find_first_of(L'\n'));
+      size_t nextLineLength = memoryBufferHandle.remainingBuffer.find_first_of(L'\n');
 
       if (std::wstring_view::npos == nextLineLength)
-        nextLineLength = static_cast<int>(memoryBufferHandle.remainingBuffer.length());
+        nextLineLength = memoryBufferHandle.remainingBuffer.length();
       else
         nextLineLength += 1;
 
       int numCharsWritten = 0;
-      for (; numCharsWritten < std::min(nextLineLength, (lineBufferCount - 1)); ++numCharsWritten)
-        lineBuffer[numCharsWritten] = memoryBufferHandle.remainingBuffer[numCharsWritten];
+      for (; numCharsWritten <
+           std::min(nextLineLength, static_cast<size_t>((configLine.Capacity() - 1)));
+           ++numCharsWritten)
+        configLine[numCharsWritten] = memoryBufferHandle.remainingBuffer[numCharsWritten];
 
       memoryBufferHandle.remainingBuffer.remove_prefix(numCharsWritten);
+      configLine.UnsafeSetSize(numCharsWritten);
 
-      // Trim off any whitespace on the end of the line.
-      while (iswspace(lineBuffer[numCharsWritten - 1]))
-        numCharsWritten -= 1;
-
-      lineBuffer[numCharsWritten] = L'\0';
-
-      return numCharsWritten;
+      while ((false == configLine.Empty()) && (iswspace(configLine.Back())))
+        configLine.RemoveSuffix(1);
+      return true;
     }
 
     Value::Value(const Value& other)
@@ -864,14 +814,13 @@ namespace Infra
       std::wstring_view thisSection = kSectionNameGlobal;
 
       int configLineNumber = 1;
-      TemporaryBuffer<wchar_t> configLineBuffer;
-      int configLineLength =
-          ReadAndTrimLine(readHandle, configLineBuffer.Data(), configLineBuffer.Capacity());
+      TemporaryString configLine;
+      bool configLineReadResult = ReadAndTrimLine(readHandle, configLine);
       bool skipValueLines = false;
 
-      while (configLineLength >= 0)
+      while (true == configLineReadResult)
       {
-        switch (ClassifyConfigurationFileLine(configLineBuffer.Data(), configLineLength))
+        switch (ClassifyConfigurationFileLine(configLine))
         {
           case ELineClassification::Error:
             AppendErrorMessage(Strings::Format(
@@ -883,7 +832,7 @@ namespace Infra
 
           case ELineClassification::Section:
           {
-            std::wstring_view section = ParseSection(configLineBuffer.Data());
+            std::wstring_view section = ParseSection(configLine);
 
             if (0 != seenSections.count(section))
             {
@@ -940,7 +889,7 @@ namespace Infra
             {
               std::wstring_view name;
               std::wstring_view value;
-              ParseNameAndValue(configLineBuffer.Data(), name, value);
+              ParseNameAndValue(configLine, name, value);
 
               const auto& existingName = configToFill[thisSection][name];
               const EValueType valueType =
@@ -1154,8 +1103,8 @@ namespace Infra
             break;
         }
 
-        configLineLength =
-            ReadAndTrimLine(readHandle, configLineBuffer.Data(), configLineBuffer.Capacity());
+        configLine.Clear();
+        configLineReadResult = ReadAndTrimLine(readHandle, configLine);
         configLineNumber += 1;
       }
 
@@ -1170,7 +1119,7 @@ namespace Infra
               L"%s(%d): I/O error while reading.", configSourceName.data(), configLineNumber));
           return configToFill;
         }
-        else if (configLineLength < 0)
+        else if (false == configLineReadResult)
         {
           AppendErrorMessage(Strings::Format(
               L"%s(%d): Line is too long.", configSourceName.data(), configLineNumber));
