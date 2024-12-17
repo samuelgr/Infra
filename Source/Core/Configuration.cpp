@@ -224,8 +224,7 @@ namespace Infra
 
     /// Classifies the provided configuration file line and returns a value indicating the
     /// result.
-    /// @param [in] buf Buffer containing the configuration file line.
-    /// @param [in] length Number of characters in the buffer.
+    /// @param [in] configLine Line read from the configuration file.
     /// @return Configuration line classification.
     static ELineClassification ClassifyConfigurationFileLine(std::wstring_view configLine)
     {
@@ -360,10 +359,8 @@ namespace Infra
     }
 
     /// Parses a name and a value for the specified configuration file line, which must first
-    /// have been classified as containing a value. On return, the configuration file line is
-    /// modified to add null termination such that the views are guaranteed to be
-    /// null-terminated.
-    /// @param [in] configFileLine Buffer containing the configuration file line.
+    /// have been classified as containing a name and value pair.
+    /// @param [in] configLine Line read from the configuration file.
     /// @param [out] nameString Filled with the name of the configuration setting.
     /// @param [out] valueString Filled with the value specified for the configuration setting.
     static void ParseNameAndValue(
@@ -385,9 +382,8 @@ namespace Infra
     }
 
     /// Parses a section name from the specified configuration file line, which must first have
-    /// been classified as containing a section name. On return, the configuration file line is
-    /// modified to add null termination such that the view is guaranteed to be null-terminated.
-    /// @param [in] configFileLine Buffer containing the configuration file line.
+    /// been classified as containing a section name.
+    /// @param [in] configLine Line read from the configuration file.
     /// @param String containing the name of the configuration section.
     static std::wstring_view ParseSection(std::wstring_view configLine)
     {
@@ -397,29 +393,27 @@ namespace Infra
       return parsedSection;
     }
 
-    /// Reads a single line from the specified handle, verifies that it fits within the
-    /// specified buffer, and removes trailing whitespace. Default implementation does nothing
-    /// and always returns an error.
+    /// Reads a single line from the specified handle and verifies that it fits within the
+    /// specified buffer. Default implementation does nothing and always returns an error.
     /// @tparam ReadHandleType Handle that implements the functions required to read one line at
     /// a time from an input source.
     /// @param [in] readHandle Handle to the configuration file data from which to read.
-    /// @param [out] lineBuffer Filled with text read from the specified file.
-    /// @param [in] lineBufferCount Length, in character units, of the line buffer.
-    /// @return Length of the string that was read, with -1 indicating an error condition.
-    template <typename ReadHandleType> static bool ReadAndTrimLine(
+    /// @param [out] configLine Filled with text read from the specified file.
+    /// @return `true` if the line was read successfully and fits within the provided buffer,
+    /// `false` otherwise.
+    template <typename ReadHandleType> static bool ReadLine(
         ReadHandleType& readHandle, TemporaryString& configLine)
     {
       return -1;
     }
 
-    /// Reads a single line from the specified file handle, verifies that it fits within the
-    /// specified buffer, and removes trailing whitespace. This is a template specialization for
-    /// reading from files.
+    /// Reads a single line from the specified file handle and verifies that it fits within the
+    /// specified buffer. This is a template specialization for reading from files.
     /// @param [in] fileHandle File handle for the configuration file.
-    /// @param [out] lineBuffer Filled with text read from the specified file.
-    /// @param [in] lineBufferCount Length, in character units, of the line buffer.
-    /// @return Length of the string that was read, with -1 indicating an error condition.
-    template <> static bool ReadAndTrimLine<FileHandle>(
+    /// @param [out] configLine Filled with text read from the specified file.
+    /// @return `true` if the line was read successfully and fits within the provided buffer,
+    /// `false` otherwise.
+    template <> static bool ReadLine<FileHandle>(
         FileHandle& fileHandle, TemporaryString& configLine)
     {
       // Results in a null-terminated string guaranteed, but might not be the whole line if
@@ -429,19 +423,17 @@ namespace Infra
       configLine.UnsafeSetSize(
           static_cast<unsigned int>(wcsnlen(configLine.Data(), configLine.Capacity())));
 
-      while (iswspace(configLine.Back()))
-        configLine.RemoveSuffix(1);
       return true;
     }
 
-    /// Reads a single line from the specified in-memory configuration file data, verifies that
-    /// it fits within the specified buffer, and removes trailing whitespace. This is a template
-    /// specialization for reading from an in-memory buffer.
+    /// Reads a single line from the specified in-memory configuration file data and verifies that
+    /// it fits within the specified buffer. This is a template specialization for reading from an
+    /// in-memory buffer.
     /// @param [in] memoryBufferHandle Handle object for reading from the in-memory buffer.
-    /// @param [out] lineBuffer Filled with text read from the specified file.
-    /// @param [in] lineBufferCount Length, in character units, of the line buffer.
-    /// @return Length of the string that was read, with -1 indicating an error condition.
-    template <> static bool ReadAndTrimLine<MemoryBufferHandle>(
+    /// @param [out] configLine Filled with text read from the specified file.
+    /// @return `true` if the line was read successfully and fits within the provided buffer,
+    /// `false` otherwise.
+    template <> static bool ReadLine<MemoryBufferHandle>(
         MemoryBufferHandle& memoryBufferHandle, TemporaryString& configLine)
     {
       if (memoryBufferHandle.IsEndOfInput()) return false;
@@ -462,9 +454,15 @@ namespace Infra
       memoryBufferHandle.remainingBuffer.remove_prefix(numCharsWritten);
       configLine.UnsafeSetSize(numCharsWritten);
 
-      while ((false == configLine.Empty()) && (iswspace(configLine.Back())))
-        configLine.RemoveSuffix(1);
       return true;
+    }
+
+    /// Trims trailing whitespace from the specified string.
+    /// @param [in,out] stringToTrim String to be trimmed. Modified in place.
+    static void TrimTrailingWhitespace(TemporaryString& stringToTrim)
+    {
+      while ((false == stringToTrim.Empty()) && (iswspace(stringToTrim.Back())))
+        stringToTrim.RemoveSuffix(1);
     }
 
     Value::Value(const Value& other)
@@ -815,11 +813,13 @@ namespace Infra
 
       int configLineNumber = 1;
       TemporaryString configLine;
-      bool configLineReadResult = ReadAndTrimLine(readHandle, configLine);
+      bool configLineReadResult = ReadLine(readHandle, configLine);
       bool skipValueLines = false;
 
       while (true == configLineReadResult)
       {
+        TrimTrailingWhitespace(configLine);
+
         switch (ClassifyConfigurationFileLine(configLine))
         {
           case ELineClassification::Error:
@@ -1104,7 +1104,7 @@ namespace Infra
         }
 
         configLine.Clear();
-        configLineReadResult = ReadAndTrimLine(readHandle, configLine);
+        configLineReadResult = ReadLine(readHandle, configLine);
         configLineNumber += 1;
       }
 
