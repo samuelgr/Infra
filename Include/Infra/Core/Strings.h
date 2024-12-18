@@ -104,7 +104,6 @@ namespace Infra
     {
       while (str.starts_with(leadingChar))
         str.remove_prefix(1);
-
       return str;
     }
 
@@ -119,8 +118,19 @@ namespace Infra
     {
       while (str.ends_with(trailingChar))
         str.remove_suffix(1);
-
       return str;
+    }
+
+    /// Removes the all occurrences of specified leading and trailing character from the input
+    /// string view and returns the result.
+    /// @tparam CharType Type of character in each string, either narrow or wide.
+    /// @param [in] str String view from which to remove the specified character on both ends.
+    /// @param [in] charToRemove Character to strip from this string.
+    /// @return Resulting string view after the character is removed from both ends.
+    template <typename CharType> inline std::basic_string_view<CharType> RemoveLeadingAndTrailing(
+        std::basic_string_view<CharType> str, CharType charToTrim)
+    {
+      return RemoveTrailing(RemoveLeading(str, charToTrim), charToTrim);
     }
 
     /// Splits a string using the specified delimiter string and returns a list of views, each
@@ -211,6 +221,30 @@ namespace Infra
         std::basic_string_view<CharType> stringToTokenize,
         const std::basic_string_view<CharType>* delimiters,
         unsigned int numDelimiters);
+
+    /// Trims whitespace at the beginning of the specified string.
+    /// @tparam CharType Type of character in each string, either narrow or wide.
+    /// @param [in] str String from which to trim whitespace.
+    /// @return Input string with leading whitespace removed.
+    template <typename CharType> std::basic_string_view<CharType> TrimLeadingWhitespace(
+        std::basic_string_view<CharType> str);
+
+    /// Trims whitespace at the end of the specified string.
+    /// @tparam CharType Type of character in each string, either narrow or wide.
+    /// @param [in] str String from which to trim whitespace.
+    /// @return Input string with trailing whitespace removed.
+    template <typename CharType> std::basic_string_view<CharType> TrimTrailingWhitespace(
+        std::basic_string_view<CharType> str);
+
+    /// Trims whitespace at the beginning and end of the specified string.
+    /// @tparam CharType Type of character in each string, either narrow or wide.
+    /// @param [in] str String from which to trim whitespace.
+    /// @return Input string with leading and trailing whitespace removed.
+    template <typename CharType> inline std::basic_string_view<CharType> TrimWhitespace(
+        std::basic_string_view<CharType> str)
+    {
+      return TrimTrailingWhitespace(TrimLeadingWhitespace(str));
+    }
 
     /// Case-insensitive hasher for various kinds of string representations. This is a
     /// type-transparent hasher for all string representations that are implicitly convertable

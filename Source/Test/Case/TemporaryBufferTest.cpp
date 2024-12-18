@@ -193,6 +193,15 @@ namespace CoreInfraTest
     TEST_ASSERT(L"This is a test string" == testString);
   }
 
+  // Verifies that trailing character removal does nothing when the input string is empty.
+  TEST_CASE(TemporaryString_RemoveTrailing_EmptyString)
+  {
+    TemporaryString testString;
+    TEST_ASSERT(true == testString.Empty());
+    testString.RemoveTrailing(L'\0');
+    TEST_ASSERT(true == testString.Empty());
+  }
+
   // Verifies that trailing character removal works correctly and removes all instances of the
   // specified character.
   TEST_CASE(TemporaryString_RemoveTrailing_CharacterMatches)
@@ -200,6 +209,15 @@ namespace CoreInfraTest
     TemporaryString testString = L"This is a test string...........";
     testString.RemoveTrailing(L'.');
     TEST_ASSERT(L"This is a test string" == testString);
+  }
+
+  // Verifies that trailing character removal works correctly when all of the characters match, thus
+  // leaving behind an empty string.
+  TEST_CASE(TemporaryString_RemoveTrailing_AllCharactersMatch)
+  {
+    TemporaryString testString = L"...........";
+    testString.RemoveTrailing(L'.');
+    TEST_ASSERT(true == testString.Empty());
   }
 
   // Verifies that trailing character removal works correctly and does not edit the string if the
@@ -211,4 +229,17 @@ namespace CoreInfraTest
     TEST_ASSERT(L"This is a test string" == testString);
   }
 
+  TEST_CASE(TemporaryString_TrimTrailingWhitespace_Nominal)
+  {
+    TemporaryString testString = L"This is a test string   \n\r\f\t   \t     ";
+    testString.TrimTrailingWhitespace();
+    TEST_ASSERT(L"This is a test string" == testString);
+  }
+
+  TEST_CASE(TemporaryString_TrimTrailingWhitespace_EntireStringIsWhitespace)
+  {
+    TemporaryString testString = L"   \n\r\f\t   \t     ";
+    testString.TrimTrailingWhitespace();
+    TEST_ASSERT(true == testString.Empty());
+  }
 } // namespace CoreInfraTest

@@ -367,18 +367,8 @@ namespace Infra
         std::wstring_view configLine, std::wstring_view& nameString, std::wstring_view& valueString)
     {
       const size_t equalSignPosition = configLine.find_first_of(L'=');
-
-      nameString = configLine.substr(0, equalSignPosition);
-      while (iswblank(nameString.front()))
-        nameString.remove_prefix(1);
-      while (iswblank(nameString.back()))
-        nameString.remove_suffix(1);
-
-      valueString = configLine.substr(1 + equalSignPosition);
-      while (iswblank(valueString.front()))
-        valueString.remove_prefix(1);
-      while (iswblank(valueString.back()))
-        valueString.remove_suffix(1);
+      nameString = Strings::TrimWhitespace(configLine.substr(0, equalSignPosition));
+      valueString = Strings::TrimWhitespace(configLine.substr(1 + equalSignPosition));
     }
 
     /// Parses a section name from the specified configuration file line, which must first have
@@ -455,14 +445,6 @@ namespace Infra
       configLine.UnsafeSetSize(numCharsWritten);
 
       return true;
-    }
-
-    /// Trims trailing whitespace from the specified string.
-    /// @param [in,out] stringToTrim String to be trimmed. Modified in place.
-    static void TrimTrailingWhitespace(TemporaryString& stringToTrim)
-    {
-      while ((false == stringToTrim.Empty()) && (iswspace(stringToTrim.Back())))
-        stringToTrim.RemoveSuffix(1);
     }
 
     Value::Value(const Value& other)
@@ -818,7 +800,7 @@ namespace Infra
 
       while (true == configLineReadResult)
       {
-        TrimTrailingWhitespace(configLine);
+        configLine.TrimTrailingWhitespace();
 
         switch (ClassifyConfigurationFileLine(configLine))
         {

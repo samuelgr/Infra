@@ -241,6 +241,7 @@ namespace Infra
     /// @return Read-only reference to the last element in this container.
     inline const T& Back(void) const
     {
+      DebugAssert(false == Empty(), "Attempting to access the last element of an empty container.");
       return (*this)[size - 1];
     }
 
@@ -248,6 +249,7 @@ namespace Infra
     /// @return Mutable reference to the last element in this container.
     inline T& Back(void)
     {
+      DebugAssert(false == Empty(), "Attempting to access the last element of an empty container.");
       return (*this)[size - 1];
     }
 
@@ -286,6 +288,8 @@ namespace Infra
     /// @return Read-only reference to the first element in this container.
     inline const T& Front(void) const
     {
+      DebugAssert(
+          false == Empty(), "Attempting to access the first element of an empty container.");
       return (*this)[0];
     }
 
@@ -293,6 +297,8 @@ namespace Infra
     /// @return Mutable reference to the first element in this container.
     inline T& Front(void)
     {
+      DebugAssert(
+          false == Empty(), "Attempting to access the first element of an empty container.");
       return (*this)[0];
     }
 
@@ -630,11 +636,18 @@ namespace Infra
       }
     }
 
-    // Removes all occurrences the specified trailing character from this string.
-    // @param [in] trailingChar Trailing character to strip from this string.
+    /// Removes all occurrences of the specified trailing character from this string.
+    /// @param [in] trailingChar Trailing character to strip from this string.
     inline void RemoveTrailing(wchar_t trailingChar)
     {
       while (AsStringView().ends_with(trailingChar))
+        RemoveSuffix(1);
+    }
+
+    /// Removes all whitespace characters at the end of this string.
+    inline void TrimTrailingWhitespace(void)
+    {
+      while (!Empty() && std::iswspace(Back()))
         RemoveSuffix(1);
     }
 

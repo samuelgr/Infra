@@ -29,9 +29,34 @@ namespace Infra
 {
   namespace Strings
   {
-    /// Converts a single character to lowercase.
-    /// Default implementation does nothing useful.
-    /// @tparam CharType Character type.
+    /// Checks if the specified character is classified as whitespace. Default implementation does
+    /// nothing useful.
+    /// @tparam CharType Character type, wide or narrow.
+    /// @param [in] c Character to check.
+    /// @return `false`, as the default implementation does nothing useful.
+    template <typename CharType> static inline bool IsWhitespace(CharType c)
+    {
+      return false;
+    }
+
+    /// Checks if the specified narrow character is classified as whitespace.
+    /// @param [in] c Character to check.
+    /// @return `true` if the input character is whitespace, `false` otherwise.
+    template <> static inline bool IsWhitespace(char c)
+    {
+      return (0 != std::isspace(c));
+    }
+
+    /// Checks if the specified wide character is classified as whitespace.
+    /// @param [in] c Character to check.
+    /// @return `true` if the input character is whitespace, `false` otherwise.
+    template <> static inline bool IsWhitespace(wchar_t c)
+    {
+      return (0 != std::iswspace(c));
+    }
+
+    /// Converts a single character to lowercase. Default implementation does nothing useful.
+    /// @tparam CharType Character type, wide or narrow.
     /// @param [in] c Character to convert.
     /// @return Null character, as the default implementation does nothing useful.
     template <typename CharType> static inline CharType ToLowercase(CharType c)
@@ -40,7 +65,6 @@ namespace Infra
     }
 
     /// Converts a single narrow character to lowercase.
-    /// @tparam CharType Character type.
     /// @param [in] c Character to convert.
     /// @return Lowercase version of the input, if a conversion is possible, or the same
     /// character as the input otherwise.
@@ -51,7 +75,6 @@ namespace Infra
 
     /// Converts a single wide character to lowercase.
     /// Default implementation does nothing useful.
-    /// @tparam CharType Character type.
     /// @param [in] c Character to convert.
     /// @return Lowercase version of the input, if a conversion is possible, or the same
     /// character as the input otherwise.
@@ -350,5 +373,27 @@ namespace Infra
         size_t&, std::string_view, const std::string_view*, unsigned int);
     template std::optional<std::wstring_view> Tokenize<wchar_t>(
         size_t&, std::wstring_view, const std::wstring_view*, unsigned int);
+
+    template <typename CharType> std::basic_string_view<CharType> TrimLeadingWhitespace(
+        std::basic_string_view<CharType> str)
+    {
+      while ((false == str.empty()) && (true == IsWhitespace(str.front())))
+        str.remove_prefix(1);
+      return str;
+    }
+
+    template std::string_view TrimLeadingWhitespace(std::string_view str);
+    template std::wstring_view TrimLeadingWhitespace(std::wstring_view str);
+
+    template <typename CharType> std::basic_string_view<CharType> TrimTrailingWhitespace(
+        std::basic_string_view<CharType> str)
+    {
+      while ((false == str.empty()) && (true == IsWhitespace(str.back())))
+        str.remove_suffix(1);
+      return str;
+    }
+
+    template std::string_view TrimTrailingWhitespace(std::string_view str);
+    template std::wstring_view TrimTrailingWhitespace(std::wstring_view str);
   } // namespace Strings
 } // namespace Infra

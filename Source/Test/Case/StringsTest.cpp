@@ -20,6 +20,80 @@ namespace CoreInfraTest
 {
   using namespace ::Infra;
 
+  // Verifies that leading characters are correctly removed.
+  TEST_CASE(Strings_RemoveLeading_Nominal)
+  {
+    constexpr std::wstring_view kInputString = L".........This is a test string...........";
+    constexpr std::wstring_view expectedTrimmedString = L"This is a test string...........";
+    const std::wstring_view actualTrimmedString = Strings::RemoveLeading(kInputString, L'.');
+    TEST_ASSERT(actualTrimmedString == expectedTrimmedString);
+  }
+
+  // Verifies that trailing characters are correctly removed.
+  TEST_CASE(Strings_RemoveTrailing_Nominal)
+  {
+    constexpr std::wstring_view kInputString = L".........This is a test string...........";
+    constexpr std::wstring_view expectedTrimmedString = L".........This is a test string";
+    const std::wstring_view actualTrimmedString = Strings::RemoveTrailing(kInputString, L'.');
+    TEST_ASSERT(actualTrimmedString == expectedTrimmedString);
+  }
+
+  // Verifies that leading and trailing characters are correctly removed.
+  TEST_CASE(Strings_RemoveLeadingAndTrailing_Nominal)
+  {
+    constexpr std::wstring_view kInputString = L".........This is a test string...........";
+    constexpr std::wstring_view expectedTrimmedString = L"This is a test string";
+    const std::wstring_view actualTrimmedString =
+        Strings::RemoveLeadingAndTrailing(kInputString, L'.');
+    TEST_ASSERT(actualTrimmedString == expectedTrimmedString);
+  }
+
+  // Verifies that leading and trailing characters are correctly removed and the resulting string is
+  // empty if the input string consists entirely of matching characters.
+  TEST_CASE(Strings_RemoveLeadingAndTrailing_AllCharactersMatch)
+  {
+    constexpr std::wstring_view kInputString = L"....................";
+    TEST_ASSERT(true == Strings::RemoveLeadingAndTrailing(kInputString, L'.').empty());
+  }
+
+  // Verifies that leading whitespace characters are correctly trimmed.
+  TEST_CASE(Strings_TrimLeadingWhitespace_Nominal)
+  {
+    constexpr std::wstring_view kInputString =
+        L"   \t\t\t\n\n\n   This is a test string   \t\t\t\n\n\n   ";
+    constexpr std::wstring_view expectedTrimmedString = L"This is a test string   \t\t\t\n\n\n   ";
+    const std::wstring_view actualTrimmedString = Strings::TrimLeadingWhitespace(kInputString);
+    TEST_ASSERT(actualTrimmedString == expectedTrimmedString);
+  }
+
+  // Verifies that trailing whitespace characters are correctly trimmed.
+  TEST_CASE(Strings_TrimTrailingWhitespace_Nominal)
+  {
+    constexpr std::wstring_view kInputString =
+        L"   \t\t\t\n\n\n   This is a test string   \t\t\t\n\n\n   ";
+    constexpr std::wstring_view expectedTrimmedString = L"   \t\t\t\n\n\n   This is a test string";
+    const std::wstring_view actualTrimmedString = Strings::TrimTrailingWhitespace(kInputString);
+    TEST_ASSERT(actualTrimmedString == expectedTrimmedString);
+  }
+
+  // Verifies that leading and trailing whitespace characters are correctly trimmed.
+  TEST_CASE(Strings_TrimWhitespace_Nominal)
+  {
+    constexpr std::wstring_view kInputString =
+        L"   \t\t\t\n\n\n   This is a test string   \t\t\t\n\n\n   ";
+    constexpr std::wstring_view expectedTrimmedString = L"This is a test string";
+    const std::wstring_view actualTrimmedString = Strings::TrimWhitespace(kInputString);
+    TEST_ASSERT(actualTrimmedString == expectedTrimmedString);
+  }
+
+  // Verifies that a string that consists entirely of whitespace is correctly trimmed down to an
+  // empty string.
+  TEST_CASE(Strings_TrimWhitespace_EntireStringIsWhitespace)
+  {
+    constexpr std::wstring_view kInputString = L"   \t\t\t\n\n\n      \t\t\t\n\n\n   ";
+    TEST_ASSERT(true == Strings::TrimWhitespace(kInputString).empty());
+  }
+
   // Verifies that strings are correctly formatted using the Format function.
   TEST_CASE(Strings_Format)
   {
