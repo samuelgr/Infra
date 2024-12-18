@@ -50,15 +50,13 @@ namespace Infra
       Value,
     };
 
-    /// Wrapper around a standard file handle.
-    /// Attempts to open the specified file on construction and close it on destruction.
+    /// Wrapper around a standard file handle. Attempts to open the specified file on construction
+    /// and close it on destruction.
     struct FileHandle
     {
-      FILE* fileHandle = nullptr;
-
-      inline FileHandle(const wchar_t* filename, const wchar_t* mode)
+      inline FileHandle(const wchar_t* filename)
       {
-        _wfopen_s(&fileHandle, filename, mode);
+        _wfopen_s(&fileHandle, filename, L"r");
       }
 
       FileHandle(const FileHandle& other) = delete;
@@ -87,13 +85,13 @@ namespace Infra
       {
         return ferror(fileHandle);
       }
+
+      FILE* fileHandle = nullptr;
     };
 
     /// Wrapper that emulates a file handle but for in-memory buffers.
     struct MemoryBufferHandle
     {
-      std::wstring_view remainingBuffer;
-
       inline MemoryBufferHandle(std::wstring_view configBuffer) : remainingBuffer(configBuffer) {}
 
       inline bool IsEndOfInput(void)
@@ -105,6 +103,8 @@ namespace Infra
       {
         return false;
       }
+
+      std::wstring_view remainingBuffer;
     };
 
     /// Determines and returns the canonical single-valued type for each possible multi-valued type
@@ -754,13 +754,16 @@ namespace Infra
     {
       errorMessages.reset();
 
-      FileHandle configFileHandle(configFileName.data(), L"r");
+      FileHandle configFileHandle(configFileName.data());
       if (nullptr == configFileHandle)
       {
         ConfigurationData configDataFromNonExistentFile;
 
         if (true == mustExist)
-          AppendErrorMessage(Strings::Format(L"%s: Unable to open file.", configFileName.data()));
+          AppendErrorMessage(Strings::Format(
+              L"%.*s: Unable to open file.",
+              static_cast<int>(configFileName.length()),
+              configFileName.data()));
 
         return configDataFromNonExistentFile;
       }
@@ -806,7 +809,10 @@ namespace Infra
         {
           case ELineClassification::Error:
             AppendErrorMessage(Strings::Format(
-                L"%s(%d): Unable to parse line.", configSourceName.data(), configLineNumber));
+                L"%.*s(%d): Unable to parse line.",
+                static_cast<int>(configSourceName.length()),
+                configSourceName.data(),
+                configLineNumber));
             break;
 
           case ELineClassification::Ignore:
@@ -819,9 +825,11 @@ namespace Infra
             if (0 != seenSections.count(section))
             {
               AppendErrorMessage(Strings::Format(
-                  L"%s(%d): %s: Duplicated section name.",
+                  L"%.*s(%d): %.*s: Duplicated section name.",
+                  static_cast<int>(configSourceName.length()),
                   configSourceName.data(),
                   configLineNumber,
+                  static_cast<int>(section.length()),
                   section.data()));
               skipValueLines = true;
               break;
@@ -833,15 +841,18 @@ namespace Infra
               case EAction::Error:
                 if (true == sectionAction.HasErrorMessage())
                   AppendErrorMessage(Strings::Format(
-                      L"%s(%d): %s",
+                      L"%.*s(%d): %s",
+                      static_cast<int>(configSourceName.length()),
                       configSourceName.data(),
                       configLineNumber,
                       sectionAction.GetErrorMessage().c_str()));
                 else
                   AppendErrorMessage(Strings::Format(
-                      L"%s(%d): %s: Unrecognized section name.",
+                      L"%.*s(%d): %.*s: Unrecognized section name.",
+                      static_cast<int>(configSourceName.length()),
                       configSourceName.data(),
                       configLineNumber,
+                      static_cast<int>(section.length()),
                       section.data()));
                 skipValueLines = true;
                 break;
@@ -857,7 +868,8 @@ namespace Infra
 
               default:
                 AppendErrorMessage(Strings::Format(
-                    L"%s(%d): Internal error while processing section name.",
+                    L"%.*s(%d): Internal error while processing section name.",
+                    static_cast<int>(configSourceName.length()),
                     configSourceName.data(),
                     configLineNumber));
                 skipValueLines = true;
@@ -889,9 +901,11 @@ namespace Infra
                   if (configToFill.Contains(thisSection, name))
                   {
                     AppendErrorMessage(Strings::Format(
-                        L"%s(%d): %s: Only a single value is allowed for this setting.",
+                        L"%.*s(%d): %.*s: Only a single value is allowed for this setting.",
+                        static_cast<int>(configSourceName.length()),
                         configSourceName.data(),
                         configLineNumber,
+                        static_cast<int>(name.length()),
                         name.data()));
                     shouldParseValue = false;
                   }
@@ -908,9 +922,11 @@ namespace Infra
               {
                 case EValueType::Error:
                   AppendErrorMessage(Strings::Format(
-                      L"%s(%d): %s: Unrecognized configuration setting.",
+                      L"%.*s(%d): %.*s: Unrecognized configuration setting.",
+                      static_cast<int>(configSourceName.length()),
                       configSourceName.data(),
                       configLineNumber,
+                      static_cast<int>(name.length()),
                       name.data()));
                   break;
 
@@ -922,9 +938,11 @@ namespace Infra
                   if (false == ParseInteger(value, intValue))
                   {
                     AppendErrorMessage(Strings::Format(
-                        L"%s(%d): %s: Failed to parse integer value.",
+                        L"%.*s(%d): %.*s: Failed to parse integer value.",
+                        static_cast<int>(configSourceName.length()),
                         configSourceName.data(),
                         configLineNumber,
+                        static_cast<int>(value.length()),
                         value.data()));
                     break;
                   }
@@ -935,16 +953,20 @@ namespace Infra
                     case EAction::Error:
                       if (true == valueAction.HasErrorMessage())
                         AppendErrorMessage(Strings::Format(
-                            L"%s(%d): %s",
+                            L"%.*s(%d): %s",
+                            static_cast<int>(configSourceName.length()),
                             configSourceName.data(),
                             configLineNumber,
                             valueAction.GetErrorMessage().c_str()));
                       else
                         AppendErrorMessage(Strings::Format(
-                            L"%s(%d): %s: Invalid value for configuration setting %s.",
+                            L"%.*s(%d): %.*s: Invalid value for configuration setting %.*s.",
+                            static_cast<int>(configSourceName.length()),
                             configSourceName.data(),
                             configLineNumber,
+                            static_cast<int>(value.length()),
                             value.data(),
+                            static_cast<int>(name.length()),
                             name.data()));
                       break;
 
@@ -959,10 +981,13 @@ namespace Infra
                                   configSourceName,
                                   configLineNumber)))
                         AppendErrorMessage(Strings::Format(
-                            L"%s(%d): %s: Duplicated value for configuration setting %s.",
+                            L"%.*s(%d): %.*s: Duplicated value for configuration setting %.*s.",
+                            static_cast<int>(configSourceName.length()),
                             configSourceName.data(),
                             configLineNumber,
+                            static_cast<int>(value.length()),
                             value.data(),
+                            static_cast<int>(name.length()),
                             name.data()));
                       break;
                   }
@@ -977,9 +1002,11 @@ namespace Infra
                   if (false == ParseBoolean(value, boolValue))
                   {
                     AppendErrorMessage(Strings::Format(
-                        L"%s(%d): %s: Failed to parse Boolean value.",
+                        L"%.*s(%d): %.*s: Failed to parse Boolean value.",
+                        static_cast<int>(configSourceName.length()),
                         configSourceName.data(),
                         configLineNumber,
+                        static_cast<int>(value.length()),
                         value.data()));
                     break;
                   }
@@ -990,16 +1017,20 @@ namespace Infra
                     case EAction::Error:
                       if (true == valueAction.HasErrorMessage())
                         AppendErrorMessage(Strings::Format(
-                            L"%s(%d): %s",
+                            L"%.*s(%d): %s",
+                            static_cast<int>(configSourceName.length()),
                             configSourceName.data(),
                             configLineNumber,
                             valueAction.GetErrorMessage().c_str()));
                       else
                         AppendErrorMessage(Strings::Format(
-                            L"%s(%d): %s: Invalid value for configuration setting %s.",
+                            L"%.*s(%d): %.*s: Invalid value for configuration setting %.*s.",
+                            static_cast<int>(configSourceName.length()),
                             configSourceName.data(),
                             configLineNumber,
+                            static_cast<int>(value.length()),
                             value.data(),
+                            static_cast<int>(name.length()),
                             name.data()));
                       break;
 
@@ -1014,10 +1045,13 @@ namespace Infra
                                   configSourceName,
                                   configLineNumber)))
                         AppendErrorMessage(Strings::Format(
-                            L"%s(%d): %s: Duplicated value for configuration setting %s.",
+                            L"%.*s(%d): %.*s: Duplicated value for configuration setting %.*s.",
+                            static_cast<int>(configSourceName.length()),
                             configSourceName.data(),
                             configLineNumber,
+                            static_cast<int>(value.length()),
                             value.data(),
+                            static_cast<int>(name.length()),
                             name.data()));
                       break;
                   }
@@ -1033,16 +1067,20 @@ namespace Infra
                     case EAction::Error:
                       if (true == valueAction.HasErrorMessage())
                         AppendErrorMessage(Strings::Format(
-                            L"%s(%d): %s",
+                            L"%.*s(%d): %s",
+                            static_cast<int>(configSourceName.length()),
                             configSourceName.data(),
                             configLineNumber,
                             valueAction.GetErrorMessage().c_str()));
                       else
                         AppendErrorMessage(Strings::Format(
-                            L"%s(%d): %s: Invalid value for configuration setting %s.",
+                            L"%.*s(%d): %.*s: Invalid value for configuration setting %.*s.",
+                            static_cast<int>(configSourceName.length()),
                             configSourceName.data(),
                             configLineNumber,
+                            static_cast<int>(value.length()),
                             value.data(),
+                            static_cast<int>(name.length()),
                             name.data()));
                       break;
 
@@ -1057,10 +1095,13 @@ namespace Infra
                                   configSourceName,
                                   configLineNumber)))
                         AppendErrorMessage(Strings::Format(
-                            L"%s(%d): %s: Duplicated value for configuration setting %s.",
+                            L"%.*s(%d): %.*s: Duplicated value for configuration setting %.*s.",
+                            static_cast<int>(configSourceName.length()),
                             configSourceName.data(),
                             configLineNumber,
+                            static_cast<int>(value.length()),
                             value.data(),
+                            static_cast<int>(name.length()),
                             name.data()));
                       break;
                   }
@@ -1069,7 +1110,8 @@ namespace Infra
 
                 default:
                   AppendErrorMessage(Strings::Format(
-                      L"%s(%d): Internal error while processing configuration setting.",
+                      L"%.*s(%d): Internal error while processing configuration setting.",
+                      static_cast<int>(configSourceName.length()),
                       configSourceName.data(),
                       configLineNumber));
                   break;
@@ -1079,7 +1121,8 @@ namespace Infra
 
           default:
             AppendErrorMessage(Strings::Format(
-                L"%s(%d): Internal error while processing line.",
+                L"%.*s(%d): Internal error while processing line.",
+                static_cast<int>(configSourceName.length()),
                 configSourceName.data(),
                 configLineNumber));
             break;
@@ -1098,13 +1141,19 @@ namespace Infra
         if (readHandle.IsError())
         {
           AppendErrorMessage(Strings::Format(
-              L"%s(%d): I/O error while reading.", configSourceName.data(), configLineNumber));
+              L"%.*s(%d): I/O error while reading.",
+              static_cast<int>(configSourceName.length()),
+              configSourceName.data(),
+              configLineNumber));
           return configToFill;
         }
         else if (false == configLineReadResult)
         {
           AppendErrorMessage(Strings::Format(
-              L"%s(%d): Line is too long.", configSourceName.data(), configLineNumber));
+              L"%.*s(%d): Line is too long.",
+              static_cast<int>(configSourceName.length()),
+              configSourceName.data(),
+              configLineNumber));
           return configToFill;
         }
       }
