@@ -18,6 +18,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <limits>
+#include <memory>
 #include <optional>
 #include <sstream>
 #include <string>
@@ -50,60 +51,140 @@ namespace Infra
       Value,
     };
 
-    /// Wrapper around a standard file handle. Attempts to open the specified file on construction
-    /// and close it on destruction.
-    struct FileHandle
+    /// Interface for reading from a configuration file. Abstracts away the details of reading from
+    /// various sources, including files and memory buffers.
+    class IConfigSourceReader
     {
-      inline FileHandle(const wchar_t* filename)
+    public:
+
+      virtual ~IConfigSourceReader(void) = default;
+
+      /// Retrieves a string identifying the name of the configuration source.
+      /// @return String identifier of the config source name.
+      virtual std::wstring_view GetConfigSourceName(void) = 0;
+
+      /// Determines if the end of the input has been reached.
+      /// @return `true` if no more input is available, `false` otherwise.
+      virtual bool IsEndOfInput(void) = 0;
+
+      /// Determines if an error has occurred while reading from the input source.
+      /// @return `true` if an error has occurred, `false` otherwise.
+      virtual bool IsError(void) = 0;
+
+      /// Reads the next line from the input source and stores it into the specified temporary
+      /// string object.
+      /// @param [out] configLine Filled with the contents of the next line from the input source.
+      /// @return `true` if the line was read successfully and fits within the provided buffer,
+      /// `false` otherwise.
+      virtual bool ReadLine(TemporaryString& configLine) = 0;
+    };
+
+    /// Reader that uses a file as input. Attempts to open the specified file on construction and
+    /// close it on destruction.
+    class FileReader : public IConfigSourceReader
+    {
+    public:
+
+      inline FileReader(const wchar_t* fileName) : fileName(fileName), fileHandle(nullptr)
       {
-        _wfopen_s(&fileHandle, filename, L"r");
+        _wfopen_s(&fileHandle, fileName, L"r");
       }
 
-      FileHandle(const FileHandle& other) = delete;
+      FileReader(const FileReader& other) = delete;
 
-      inline ~FileHandle(void)
+      ~FileReader(void) override
       {
         if (nullptr != fileHandle) fclose(fileHandle);
       }
 
-      inline operator FILE*(void) const
+      // IConfigSourceReader
+      std::wstring_view GetConfigSourceName(void) override
       {
-        return fileHandle;
+        return fileName;
       }
 
-      inline FILE** operator&(void)
-      {
-        return &fileHandle;
-      }
-
-      inline bool IsEndOfInput(void)
+      bool IsEndOfInput(void) override
       {
         return feof(fileHandle);
       }
 
-      inline bool IsError(void)
+      bool IsError(void) override
       {
-        return ferror(fileHandle);
+        return ((nullptr == fileHandle) || (ferror(fileHandle)));
       }
 
-      FILE* fileHandle = nullptr;
+      bool ReadLine(TemporaryString& configLine) override
+      {
+        // Results in a null-terminated string guaranteed, but might not be the whole line if
+        // the buffer is too small.
+        if (configLine.Data() != fgetws(configLine.Data(), configLine.Capacity(), fileHandle))
+          return false;
+        configLine.UnsafeSetSize(
+            static_cast<unsigned int>(wcsnlen(configLine.Data(), configLine.Capacity())));
+        return true;
+      }
+
+    private:
+
+      /// Name of the file that is being read.
+      std::wstring fileName;
+
+      /// Handle used to read from the input source file.
+      FILE* fileHandle;
     };
 
-    /// Wrapper that emulates a file handle but for in-memory buffers.
-    struct MemoryBufferHandle
+    /// Reader that uses an in-memory buffer as input. Primarily used for tests, and does not claim
+    /// any ownership over the buffer itself.
+    class MemoryBufferReader : public IConfigSourceReader
     {
-      inline MemoryBufferHandle(std::wstring_view configBuffer) : remainingBuffer(configBuffer) {}
+    public:
 
-      inline bool IsEndOfInput(void)
+      inline MemoryBufferReader(std::wstring_view configBuffer)
+          : configSourceName(Strings::Format(
+                L"[0x%0.*zx]",
+                static_cast<int>(2 * sizeof(size_t)),
+                reinterpret_cast<size_t>(configBuffer.data()))),
+            remainingBuffer(configBuffer)
+      {}
+
+      // IConfigSourceReader
+      std::wstring_view GetConfigSourceName(void) override
+      {
+        return configSourceName;
+      }
+
+      bool IsEndOfInput(void) override
       {
         return remainingBuffer.empty();
       }
 
-      inline bool IsError(void)
+      bool IsError(void) override
       {
         return false;
       }
 
+      bool ReadLine(TemporaryString& configLine) override
+      {
+        if (IsEndOfInput()) return false;
+
+        size_t nextLineLength = remainingBuffer.find_first_of(L'\n');
+        if (std::wstring_view::npos == nextLineLength)
+          nextLineLength = remainingBuffer.length();
+        else
+          nextLineLength += 1;
+
+        if (nextLineLength > (static_cast<size_t>(configLine.Capacity()) - 1)) return false;
+        configLine = std::wstring_view(remainingBuffer.data(), nextLineLength);
+        remainingBuffer.remove_prefix(nextLineLength);
+        return true;
+      }
+
+    private:
+
+      /// String that identifies this memory buffer as a configuration source.
+      std::wstring configSourceName;
+
+      /// Remaining contents of the memory buffer.
       std::wstring_view remainingBuffer;
     };
 
@@ -381,70 +462,6 @@ namespace Infra
       parsedSection.remove_prefix(1 + configLine.find_first_of(L'['));
       parsedSection.remove_suffix(configLine.length() - configLine.find_first_of(L']'));
       return parsedSection;
-    }
-
-    /// Reads a single line from the specified handle and verifies that it fits within the
-    /// specified buffer. Default implementation does nothing and always returns an error.
-    /// @tparam ReadHandleType Handle that implements the functions required to read one line at
-    /// a time from an input source.
-    /// @param [in] readHandle Handle to the configuration file data from which to read.
-    /// @param [out] configLine Filled with text read from the specified file.
-    /// @return `true` if the line was read successfully and fits within the provided buffer,
-    /// `false` otherwise.
-    template <typename ReadHandleType> static bool ReadLine(
-        ReadHandleType& readHandle, TemporaryString& configLine)
-    {
-      return -1;
-    }
-
-    /// Reads a single line from the specified file handle and verifies that it fits within the
-    /// specified buffer. This is a template specialization for reading from files.
-    /// @param [in] fileHandle File handle for the configuration file.
-    /// @param [out] configLine Filled with text read from the specified file.
-    /// @return `true` if the line was read successfully and fits within the provided buffer,
-    /// `false` otherwise.
-    template <> static bool ReadLine<FileHandle>(
-        FileHandle& fileHandle, TemporaryString& configLine)
-    {
-      // Results in a null-terminated string guaranteed, but might not be the whole line if
-      // the buffer is too small.
-      if (configLine.Data() != fgetws(configLine.Data(), configLine.Capacity(), fileHandle))
-        return false;
-      configLine.UnsafeSetSize(
-          static_cast<unsigned int>(wcsnlen(configLine.Data(), configLine.Capacity())));
-
-      return true;
-    }
-
-    /// Reads a single line from the specified in-memory configuration file data and verifies that
-    /// it fits within the specified buffer. This is a template specialization for reading from an
-    /// in-memory buffer.
-    /// @param [in] memoryBufferHandle Handle object for reading from the in-memory buffer.
-    /// @param [out] configLine Filled with text read from the specified file.
-    /// @return `true` if the line was read successfully and fits within the provided buffer,
-    /// `false` otherwise.
-    template <> static bool ReadLine<MemoryBufferHandle>(
-        MemoryBufferHandle& memoryBufferHandle, TemporaryString& configLine)
-    {
-      if (memoryBufferHandle.IsEndOfInput()) return false;
-
-      size_t nextLineLength = memoryBufferHandle.remainingBuffer.find_first_of(L'\n');
-
-      if (std::wstring_view::npos == nextLineLength)
-        nextLineLength = memoryBufferHandle.remainingBuffer.length();
-      else
-        nextLineLength += 1;
-
-      int numCharsWritten = 0;
-      for (; numCharsWritten <
-           std::min(nextLineLength, static_cast<size_t>((configLine.Capacity() - 1)));
-           ++numCharsWritten)
-        configLine[numCharsWritten] = memoryBufferHandle.remainingBuffer[numCharsWritten];
-
-      memoryBufferHandle.remainingBuffer.remove_prefix(numCharsWritten);
-      configLine.UnsafeSetSize(numCharsWritten);
-
-      return true;
     }
 
     Value::Value(const Value& other)
@@ -754,39 +771,32 @@ namespace Infra
     {
       errorMessages.reset();
 
-      FileHandle configFileHandle(configFileName.data());
-      if (nullptr == configFileHandle)
+      std::unique_ptr<IConfigSourceReader> fileReader =
+          std::make_unique<FileReader>(configFileName.data());
+      if (true == fileReader->IsError())
       {
-        ConfigurationData configDataFromNonExistentFile;
-
         if (true == mustExist)
           AppendErrorMessage(Strings::Format(
               L"%.*s: Unable to open file.",
               static_cast<int>(configFileName.length()),
               configFileName.data()));
-
-        return configDataFromNonExistentFile;
+        return ConfigurationData();
       }
 
-      return ReadConfiguration(configFileHandle, configFileName);
+      return ReadConfiguration(std::move(fileReader));
     }
 
     ConfigurationData ConfigurationFileReader::ReadInMemoryConfigurationFile(
         std::wstring_view configBuffer)
     {
       errorMessages.reset();
-
-      MemoryBufferHandle configBufferHandle(configBuffer);
-      return ReadConfiguration(
-          configBufferHandle,
-          Strings::Format(
-              L"[0x%0.*zx]",
-              static_cast<int>(2 * sizeof(size_t)),
-              reinterpret_cast<size_t>(configBuffer.data())));
+      std::unique_ptr<IConfigSourceReader> memoryBufferReader =
+          std::make_unique<MemoryBufferReader>(configBuffer);
+      return ReadConfiguration(std::move(memoryBufferReader));
     }
 
-    template <typename ReadHandleType> ConfigurationData ConfigurationFileReader::ReadConfiguration(
-        ReadHandleType& readHandle, std::wstring_view configSourceName)
+    ConfigurationData ConfigurationFileReader::ReadConfiguration(
+        std::unique_ptr<IConfigSourceReader>&& reader)
     {
       ConfigurationData configToFill;
 
@@ -798,7 +808,7 @@ namespace Infra
 
       int configLineNumber = 1;
       TemporaryString configLine;
-      bool configLineReadResult = ReadLine(readHandle, configLine);
+      bool configLineReadResult = reader->ReadLine(configLine);
       bool skipValueLines = false;
 
       while (true == configLineReadResult)
@@ -810,8 +820,8 @@ namespace Infra
           case ELineClassification::Error:
             AppendErrorMessage(Strings::Format(
                 L"%.*s(%d): Unable to parse line.",
-                static_cast<int>(configSourceName.length()),
-                configSourceName.data(),
+                static_cast<int>(reader->GetConfigSourceName().length()),
+                reader->GetConfigSourceName().data(),
                 configLineNumber));
             break;
 
@@ -826,8 +836,8 @@ namespace Infra
             {
               AppendErrorMessage(Strings::Format(
                   L"%.*s(%d): %.*s: Duplicated section name.",
-                  static_cast<int>(configSourceName.length()),
-                  configSourceName.data(),
+                  static_cast<int>(reader->GetConfigSourceName().length()),
+                  reader->GetConfigSourceName().data(),
                   configLineNumber,
                   static_cast<int>(section.length()),
                   section.data()));
@@ -842,15 +852,15 @@ namespace Infra
                 if (true == sectionAction.HasErrorMessage())
                   AppendErrorMessage(Strings::Format(
                       L"%.*s(%d): %s",
-                      static_cast<int>(configSourceName.length()),
-                      configSourceName.data(),
+                      static_cast<int>(reader->GetConfigSourceName().length()),
+                      reader->GetConfigSourceName().data(),
                       configLineNumber,
                       sectionAction.GetErrorMessage().c_str()));
                 else
                   AppendErrorMessage(Strings::Format(
                       L"%.*s(%d): %.*s: Unrecognized section name.",
-                      static_cast<int>(configSourceName.length()),
-                      configSourceName.data(),
+                      static_cast<int>(reader->GetConfigSourceName().length()),
+                      reader->GetConfigSourceName().data(),
                       configLineNumber,
                       static_cast<int>(section.length()),
                       section.data()));
@@ -869,8 +879,8 @@ namespace Infra
               default:
                 AppendErrorMessage(Strings::Format(
                     L"%.*s(%d): Internal error while processing section name.",
-                    static_cast<int>(configSourceName.length()),
-                    configSourceName.data(),
+                    static_cast<int>(reader->GetConfigSourceName().length()),
+                    reader->GetConfigSourceName().data(),
                     configLineNumber));
                 skipValueLines = true;
                 break;
@@ -902,8 +912,8 @@ namespace Infra
                   {
                     AppendErrorMessage(Strings::Format(
                         L"%.*s(%d): %.*s: Only a single value is allowed for this setting.",
-                        static_cast<int>(configSourceName.length()),
-                        configSourceName.data(),
+                        static_cast<int>(reader->GetConfigSourceName().length()),
+                        reader->GetConfigSourceName().data(),
                         configLineNumber,
                         static_cast<int>(name.length()),
                         name.data()));
@@ -923,8 +933,8 @@ namespace Infra
                 case EValueType::Error:
                   AppendErrorMessage(Strings::Format(
                       L"%.*s(%d): %.*s: Unrecognized configuration setting.",
-                      static_cast<int>(configSourceName.length()),
-                      configSourceName.data(),
+                      static_cast<int>(reader->GetConfigSourceName().length()),
+                      reader->GetConfigSourceName().data(),
                       configLineNumber,
                       static_cast<int>(name.length()),
                       name.data()));
@@ -939,8 +949,8 @@ namespace Infra
                   {
                     AppendErrorMessage(Strings::Format(
                         L"%.*s(%d): %.*s: Failed to parse integer value.",
-                        static_cast<int>(configSourceName.length()),
-                        configSourceName.data(),
+                        static_cast<int>(reader->GetConfigSourceName().length()),
+                        reader->GetConfigSourceName().data(),
                         configLineNumber,
                         static_cast<int>(value.length()),
                         value.data()));
@@ -954,15 +964,15 @@ namespace Infra
                       if (true == valueAction.HasErrorMessage())
                         AppendErrorMessage(Strings::Format(
                             L"%.*s(%d): %s",
-                            static_cast<int>(configSourceName.length()),
-                            configSourceName.data(),
+                            static_cast<int>(reader->GetConfigSourceName().length()),
+                            reader->GetConfigSourceName().data(),
                             configLineNumber,
                             valueAction.GetErrorMessage().c_str()));
                       else
                         AppendErrorMessage(Strings::Format(
                             L"%.*s(%d): %.*s: Invalid value for configuration setting %.*s.",
-                            static_cast<int>(configSourceName.length()),
-                            configSourceName.data(),
+                            static_cast<int>(reader->GetConfigSourceName().length()),
+                            reader->GetConfigSourceName().data(),
                             configLineNumber,
                             static_cast<int>(value.length()),
                             value.data(),
@@ -978,12 +988,12 @@ namespace Infra
                               Value(
                                   TIntegerValue(intValue),
                                   valueType,
-                                  configSourceName,
+                                  reader->GetConfigSourceName(),
                                   configLineNumber)))
                         AppendErrorMessage(Strings::Format(
                             L"%.*s(%d): %.*s: Duplicated value for configuration setting %.*s.",
-                            static_cast<int>(configSourceName.length()),
-                            configSourceName.data(),
+                            static_cast<int>(reader->GetConfigSourceName().length()),
+                            reader->GetConfigSourceName().data(),
                             configLineNumber,
                             static_cast<int>(value.length()),
                             value.data(),
@@ -1003,8 +1013,8 @@ namespace Infra
                   {
                     AppendErrorMessage(Strings::Format(
                         L"%.*s(%d): %.*s: Failed to parse Boolean value.",
-                        static_cast<int>(configSourceName.length()),
-                        configSourceName.data(),
+                        static_cast<int>(reader->GetConfigSourceName().length()),
+                        reader->GetConfigSourceName().data(),
                         configLineNumber,
                         static_cast<int>(value.length()),
                         value.data()));
@@ -1018,15 +1028,15 @@ namespace Infra
                       if (true == valueAction.HasErrorMessage())
                         AppendErrorMessage(Strings::Format(
                             L"%.*s(%d): %s",
-                            static_cast<int>(configSourceName.length()),
-                            configSourceName.data(),
+                            static_cast<int>(reader->GetConfigSourceName().length()),
+                            reader->GetConfigSourceName().data(),
                             configLineNumber,
                             valueAction.GetErrorMessage().c_str()));
                       else
                         AppendErrorMessage(Strings::Format(
                             L"%.*s(%d): %.*s: Invalid value for configuration setting %.*s.",
-                            static_cast<int>(configSourceName.length()),
-                            configSourceName.data(),
+                            static_cast<int>(reader->GetConfigSourceName().length()),
+                            reader->GetConfigSourceName().data(),
                             configLineNumber,
                             static_cast<int>(value.length()),
                             value.data(),
@@ -1042,12 +1052,12 @@ namespace Infra
                               Value(
                                   TBooleanValue(boolValue),
                                   valueType,
-                                  configSourceName,
+                                  reader->GetConfigSourceName(),
                                   configLineNumber)))
                         AppendErrorMessage(Strings::Format(
                             L"%.*s(%d): %.*s: Duplicated value for configuration setting %.*s.",
-                            static_cast<int>(configSourceName.length()),
-                            configSourceName.data(),
+                            static_cast<int>(reader->GetConfigSourceName().length()),
+                            reader->GetConfigSourceName().data(),
                             configLineNumber,
                             static_cast<int>(value.length()),
                             value.data(),
@@ -1068,15 +1078,15 @@ namespace Infra
                       if (true == valueAction.HasErrorMessage())
                         AppendErrorMessage(Strings::Format(
                             L"%.*s(%d): %s",
-                            static_cast<int>(configSourceName.length()),
-                            configSourceName.data(),
+                            static_cast<int>(reader->GetConfigSourceName().length()),
+                            reader->GetConfigSourceName().data(),
                             configLineNumber,
                             valueAction.GetErrorMessage().c_str()));
                       else
                         AppendErrorMessage(Strings::Format(
                             L"%.*s(%d): %.*s: Invalid value for configuration setting %.*s.",
-                            static_cast<int>(configSourceName.length()),
-                            configSourceName.data(),
+                            static_cast<int>(reader->GetConfigSourceName().length()),
+                            reader->GetConfigSourceName().data(),
                             configLineNumber,
                             static_cast<int>(value.length()),
                             value.data(),
@@ -1092,12 +1102,12 @@ namespace Infra
                               Value(
                                   TStringValue(value),
                                   valueType,
-                                  configSourceName,
+                                  reader->GetConfigSourceName(),
                                   configLineNumber)))
                         AppendErrorMessage(Strings::Format(
                             L"%.*s(%d): %.*s: Duplicated value for configuration setting %.*s.",
-                            static_cast<int>(configSourceName.length()),
-                            configSourceName.data(),
+                            static_cast<int>(reader->GetConfigSourceName().length()),
+                            reader->GetConfigSourceName().data(),
                             configLineNumber,
                             static_cast<int>(value.length()),
                             value.data(),
@@ -1111,8 +1121,8 @@ namespace Infra
                 default:
                   AppendErrorMessage(Strings::Format(
                       L"%.*s(%d): Internal error while processing configuration setting.",
-                      static_cast<int>(configSourceName.length()),
-                      configSourceName.data(),
+                      static_cast<int>(reader->GetConfigSourceName().length()),
+                      reader->GetConfigSourceName().data(),
                       configLineNumber));
                   break;
               }
@@ -1122,28 +1132,28 @@ namespace Infra
           default:
             AppendErrorMessage(Strings::Format(
                 L"%.*s(%d): Internal error while processing line.",
-                static_cast<int>(configSourceName.length()),
-                configSourceName.data(),
+                static_cast<int>(reader->GetConfigSourceName().length()),
+                reader->GetConfigSourceName().data(),
                 configLineNumber));
             break;
         }
 
         configLine.Clear();
-        configLineReadResult = ReadLine(readHandle, configLine);
+        configLineReadResult = reader->ReadLine(configLine);
         configLineNumber += 1;
       }
 
-      if (!readHandle.IsEndOfInput())
+      if (false == reader->IsEndOfInput())
       {
         // Stopped reading the configuration file early due to some condition other than
         // end-of-file. This indicates an error.
 
-        if (readHandle.IsError())
+        if (true == reader->IsError())
         {
           AppendErrorMessage(Strings::Format(
               L"%.*s(%d): I/O error while reading.",
-              static_cast<int>(configSourceName.length()),
-              configSourceName.data(),
+              static_cast<int>(reader->GetConfigSourceName().length()),
+              reader->GetConfigSourceName().data(),
               configLineNumber));
           return configToFill;
         }
@@ -1151,8 +1161,8 @@ namespace Infra
         {
           AppendErrorMessage(Strings::Format(
               L"%.*s(%d): Line is too long.",
-              static_cast<int>(configSourceName.length()),
-              configSourceName.data(),
+              static_cast<int>(reader->GetConfigSourceName().length()),
+              reader->GetConfigSourceName().data(),
               configLineNumber));
           return configToFill;
         }

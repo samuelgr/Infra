@@ -15,6 +15,7 @@
 #include <cstdint>
 #include <initializer_list>
 #include <map>
+#include <memory>
 #include <optional>
 #include <set>
 #include <string>
@@ -96,6 +97,10 @@ namespace Infra
       /// values are allowed.
       StringMultiValue,
     };
+
+    /// Interface for reading from a configuration file. Abstracts away the details of reading from
+    /// various sources, including files and memory buffers. For internal use only.
+    class IConfigSourceReader;
 
     /// Fully defines an action to take in response to a section or a value being read. Combines an
     /// action with a possible error message.
@@ -1060,14 +1065,11 @@ namespace Infra
       void AppendErrorMessage(std::wstring_view errorMessage);
 
       /// Internal implementation of reading and parsing configuration files from any source.
-      /// @tparam ReadHandleType Handle that implements the functions required to read one
-      /// line at a time from an input source.
       /// @param [in] readHandle Mutable reference to a handle that controls the reading
       /// process.
       /// @param [in] configSourceName Name associated with the source of the configuration
       /// file data that can be used to identify it in logs and error messages.
-      template <typename ReadHandleType> ConfigurationData ReadConfiguration(
-          ReadHandleType& readHandle, std::wstring_view configSourceName);
+      ConfigurationData ReadConfiguration(std::unique_ptr<IConfigSourceReader>&& reader);
 
       /// Holds the error messages that describes any errors that occurred during
       /// configuration file read.
