@@ -46,7 +46,7 @@ namespace CoreInfraTest
         : overrideTypeForValueFunc(overrideTypeForValueFunc)
     {}
 
-    Action ActionForString(std::wstring_view str)
+    Action ActionByName(std::wstring_view str)
     {
       if (str.contains(L"Error")) return Action::Error();
       if (str.contains(L"Skip")) return Action::Skip();
@@ -59,25 +59,25 @@ namespace CoreInfraTest
     Action ActionForSection(std::wstring_view section) override
     {
       if (kSectionNameGlobal == section) return Action::Process();
-      return ActionForString(section);
+      return ActionByName(section);
     }
 
     Action ActionForValue(
         std::wstring_view section, std::wstring_view name, TIntegerView value) override
     {
-      return ActionForString(name);
+      return ActionByName(name);
     }
 
     Action ActionForValue(
         std::wstring_view section, std::wstring_view name, TBooleanView value) override
     {
-      return ActionForString(name);
+      return ActionByName(name);
     }
 
     Action ActionForValue(
         std::wstring_view section, std::wstring_view name, TStringView value) override
     {
-      return ActionForString(name);
+      return ActionByName(name);
     }
 
     EValueType TypeForValue(std::wstring_view section, std::wstring_view name) override
@@ -908,5 +908,13 @@ namespace CoreInfraTest
     }
     TEST_ASSERT(true == duplicatedSectionNameErrorMessageFound);
     TEST_ASSERT(true == duplicatedIntegerValueErrorMessageFound);
+
+    // If the duplicated integer value was parsed, the first-seen value should have made it to the
+    // configuration data object.
+    if (true == configData.Contains(L"Section1", L"Integervalue"))
+      TEST_ASSERT(1 == *configData[L"Section1"][L"Integervalue"]);
+
+    // The configuration data object should not contain any of the values in the duplicated section.
+    TEST_ASSERT(false == configData.Contains(L"secTION1", L"Booleanvalue"));
   }
 } // namespace CoreInfraTest

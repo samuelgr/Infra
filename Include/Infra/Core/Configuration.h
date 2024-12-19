@@ -138,7 +138,9 @@ namespace Infra
       /// be inserted into the configuration data object and either the specified error message or a
       /// default error message will be produced.
       /// @return Action that says to raise an error for the current line.
-      template <typename StringType> static inline Action ErrorWithMessage(StringType errorMessage)
+      template <typename StringType>
+        requires IsStringType<StringType>
+      static inline Action ErrorWithMessage(StringType errorMessage)
       {
         return Action(EAction::Error, std::wstring(errorMessage));
       }
@@ -1064,9 +1066,54 @@ namespace Infra
       /// occurred during the configuration file read attempt that fills this object.
       void AppendErrorMessage(std::wstring_view errorMessage);
 
+      /// Internal implementation of parsing, querying subclasses for the desired action, and
+      /// possibly inserting a section read from a configuration file into a configuration data
+      /// object.
+      /// @param [in] reader Low-level configuration source reader object, borrowed from the caller
+      /// for querying only.
+      /// @param [in,out] configToFill Configuration data object into which to attempt to insert the
+      /// parsed configuration value.
+      /// @param [in] configLineTrimmed Unparsed configuration line, as read from the configuration
+      /// file, with whitespace trimmed.
+      /// @param [in,out] seenSections Set of all section names seen before this one. Used to check
+      /// for duplicates, and on return, will contain the newly-parsed section name.
+      /// @param [in,out] currentSection Name of the current section. On return, updated with the
+      /// newly-parsed section name.
+      /// @param [out] skipValueLines Written to inform the caller whether or not the section is
+      /// being skipped. If set to `true` then the upcoming name/value pair lines, if any, should be
+      /// skipped that belong to the current section.
+      void ParseAndMaybeInsertSection(
+          const ConfigSourceReaderBase* reader,
+          ConfigurationData& configToFill,
+          std::wstring_view configLineTrimmed,
+          std::set<std::wstring, Strings::CaseInsensitiveLessThanComparator<wchar_t>>& seenSections,
+          std::wstring_view& currentSection,
+          bool& skipValueLines);
+
+      /// Internal implementation of parsing, querying subclasses for the desired action, and
+      /// possibly inserting a value read from a configuration file into a configuration data
+      /// object.
+      /// @tparam ValueType Type of value to be parsed and possibly inserted.
+      /// @param [in] reader Low-level configuration source reader object, borrowed from the caller
+      /// for querying only.
+      /// @param [in,out] configToFill Configuration data object into which to attempt to insert the
+      /// parsed configuration value.
+      /// @param [in] section Name of the secton that contains the configuration setting.
+      /// @param [in] name Name of the configuration setting.
+      /// @param [in] valueType Type enumerator for the value to be parsed and possibly inserted.
+      /// This is a separate parameter from the template parameter because it additionally allows
+      /// single- or multi-valued to be specified.
+      /// @param [in] valueUnparsed Unparsed value read directly from the configuration file.
+      template <typename ValueType> void ParseAndMaybeInsertValue(
+          const ConfigSourceReaderBase* reader,
+          ConfigurationData& configToFill,
+          std::wstring_view section,
+          std::wstring_view name,
+          EValueType valueType,
+          std::wstring_view valueUnparsed);
+
       /// Internal implementation of reading and parsing configuration files from any source.
-      /// @param [in] readHandle Mutable reference to a handle that controls the reading
-      /// process.
+      /// @param [in] reader Low-level configuration source reader object.
       /// @param [in] configSourceName Name associated with the source of the configuration
       /// file data that can be used to identify it in logs and error messages.
       ConfigurationData ReadConfiguration(std::unique_ptr<ConfigSourceReaderBase>&& reader);

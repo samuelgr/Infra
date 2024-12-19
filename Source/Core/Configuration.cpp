@@ -23,6 +23,7 @@
 #include <sstream>
 #include <string>
 #include <string_view>
+#include <type_traits>
 #include <vector>
 
 #include "Core/DebugAssert.h"
@@ -222,7 +223,7 @@ namespace Infra
     /// enumerator.
     /// @param [in] valueType Type for which a canonical single-valued enumerator is desired.
     /// @return Canonical single-valued enumerator, which might be the same as the input parameter.
-    static EValueType CanonicalSingleValueType(EValueType valueType)
+    static constexpr EValueType CanonicalSingleValueType(EValueType valueType)
     {
       switch (valueType)
       {
@@ -235,6 +236,80 @@ namespace Infra
         default:
           return valueType;
       }
+    }
+
+    /// Determines if the specified type allows multiple values.
+    /// @param [in] type Type enumerator to check.
+    /// @return `true` if multiple values are allowed, `false` otherwise.
+    static constexpr bool TypeAllowsMultipleValues(EValueType type)
+    {
+      switch (type)
+      {
+        case EValueType::IntegerMultiValue:
+        case EValueType::BooleanMultiValue:
+        case EValueType::StringMultiValue:
+          return true;
+
+        default:
+          return false;
+      }
+    }
+
+    /// Retrieves a string representation of the specified value type.
+    /// @param [in] type Value type for which a string representation is desired.
+    /// @return String representation of the value type.
+    static constexpr std::wstring_view TypeToString(EValueType type)
+    {
+      switch (type)
+      {
+        case EValueType::Integer:
+        case EValueType::IntegerMultiValue:
+          return L"integer";
+
+        case EValueType::Boolean:
+        case EValueType::BooleanMultiValue:
+          return L"Boolean";
+
+        case EValueType::String:
+        case EValueType::StringMultiValue:
+          return L"string";
+
+        case EValueType::Error:
+          return L"(error type)";
+
+        default:
+          return L"(unknown type)";
+      }
+    }
+
+    /// Converts the specified value type to its associated single-valued enumerator.
+    /// @tparam ValueType Value type for which an associated enumerator is requested.
+    /// @return Associated enumerator.
+    template <typename ValueType> static consteval EValueType ValueTypeToSingleValueEnumerator(void)
+    {
+      if constexpr (std::is_same_v<ValueType, TIntegerValue>)
+        return EValueType::Integer;
+      else if constexpr (std::is_same_v<ValueType, TBooleanValue>)
+        return EValueType::Boolean;
+      else if constexpr (std::is_same_v<ValueType, TStringValue>)
+        return EValueType::String;
+      else
+        return EValueType::Error;
+    }
+
+    /// Converts the specified value type to its associated multi-valued enumerator.
+    /// @tparam ValueType Value type for which an associated enumerator is requested.
+    /// @return Associated enumerator.
+    template <typename ValueType> static consteval EValueType ValueTypeToMultiValueEnumerator(void)
+    {
+      if constexpr (std::is_same_v<ValueType, TIntegerValue>)
+        return EValueType::IntegerMultiValue;
+      else if constexpr (std::is_same_v<ValueType, TBooleanValue>)
+        return EValueType::BooleanMultiValue;
+      else if constexpr (std::is_same_v<ValueType, TStringValue>)
+        return EValueType::StringMultiValue;
+      else
+        return EValueType::Error;
     }
 
     /// Tests if the supplied character is allowed as a configuration setting name (the part
@@ -251,7 +326,7 @@ namespace Infra
           return true;
 
         default:
-          return (iswalnum(charToTest) ? true : false);
+          return (std::iswalnum(charToTest) ? true : false);
       }
     }
 
@@ -288,7 +363,7 @@ namespace Infra
           return true;
 
         default:
-          return (iswalnum(charToTest) ? true : false);
+          return (std::iswalnum(charToTest) ? true : false);
       }
     }
 
@@ -329,76 +404,78 @@ namespace Infra
           return true;
 
         default:
-          return (iswalnum(charToTest) ? true : false);
+          return (std::iswalnum(charToTest) ? true : false);
       }
     }
 
     /// Classifies the provided configuration file line and returns a value indicating the
     /// result.
-    /// @param [in] configLine Line read from the configuration file.
+    /// @param [in] configLine Line read from the configuration file, with whitespace already
+    /// trimmed.
     /// @return Configuration line classification.
-    static ELineClassification ClassifyConfigurationFileLine(std::wstring_view configLine)
+    static ELineClassification ClassifyConfigurationFileLine(std::wstring_view configLineTrimmed)
     {
-      // Skip over all whitespace at the start of the input line.
-      while ((false == configLine.empty()) && (iswblank(configLine.front())))
-        configLine.remove_prefix(1);
-
       // Sanity check: zero-length and all-whitespace lines can be safely ignored.
       // Also filter out comments this way.
-      if (0 == configLine.length() || L';' == configLine.front() || L'#' == configLine.front())
+      if (0 == configLineTrimmed.length() || L';' == configLineTrimmed.front() ||
+          L'#' == configLineTrimmed.front())
         return ELineClassification::Ignore;
 
       // Non-comments must, by definition, have at least three characters in them, excluding
       // all whitespace. For section headers, this must mean '[' + section name + ']'. For
       // values, this must mean name + '=' + value.
-      if (configLine.length() < 3) return ELineClassification::Error;
+      if (configLineTrimmed.length() < 3) return ELineClassification::Error;
 
-      if (L'[' == configLine[0])
+      if (L'[' == configLineTrimmed[0])
       {
         // The line cannot be a section header unless the second character is a valid
         // section name character.
-        if (!IsAllowedSectionCharacter(configLine[1])) return ELineClassification::Error;
+        if (!IsAllowedSectionCharacter(configLineTrimmed[1])) return ELineClassification::Error;
 
         // Verify that the line is a valid section header by checking for valid section name
         // characters between two square brackets.
         size_t i = 2;
-        for (; i < configLine.length() && L']' != configLine[i]; ++i)
-          if (!IsAllowedSectionCharacter(configLine[i])) return ELineClassification::Error;
-        if (L']' != configLine[i]) return ELineClassification::Error;
+        for (; i < configLineTrimmed.length() && L']' != configLineTrimmed[i]; ++i)
+          if (!IsAllowedSectionCharacter(configLineTrimmed[i])) return ELineClassification::Error;
+        if (L']' != configLineTrimmed[i]) return ELineClassification::Error;
 
         // Verify that the remainder of the line is just whitespace.
-        for (i += 1; i < configLine.length(); ++i)
-          if (!iswblank(configLine[i])) return ELineClassification::Error;
+        for (i += 1; i < configLineTrimmed.length(); ++i)
+          if (!std::iswblank(configLineTrimmed[i])) return ELineClassification::Error;
 
         return ELineClassification::Section;
       }
-      else if (IsAllowedNameCharacter(configLine[0]))
+      else if (IsAllowedNameCharacter(configLineTrimmed[0]))
       {
         // Search for whitespace or an equals sign, with all characters in between needing
         // to be allowed as value name characters.
         size_t i = 1;
-        for (; i < configLine.length() && L'=' != configLine[i] && !iswblank(configLine[i]); ++i)
-          if (!IsAllowedNameCharacter(configLine[i])) return ELineClassification::Error;
+        for (; i < configLineTrimmed.length() && L'=' != configLineTrimmed[i] &&
+             !std::iswblank(configLineTrimmed[i]);
+             ++i)
+          if (!IsAllowedNameCharacter(configLineTrimmed[i])) return ELineClassification::Error;
 
         // Skip over any whitespace present, then check for an equals sign.
-        for (; i < configLine.length() && iswblank(configLine[i]); ++i)
+        for (; i < configLineTrimmed.length() && std::iswblank(configLineTrimmed[i]); ++i)
           ;
-        if (L'=' != configLine[i]) return ELineClassification::Error;
+        if (L'=' != configLineTrimmed[i]) return ELineClassification::Error;
 
         // Skip over any whitespace present, then verify the next character is allowed to
         // start a value setting.
-        for (i += 1; i < configLine.length() && iswblank(configLine[i]); ++i)
+        for (i += 1; i < configLineTrimmed.length() && std::iswblank(configLineTrimmed[i]); ++i)
           ;
-        if (!IsAllowedValueCharacter(configLine[i])) return ELineClassification::Error;
+        if (!IsAllowedValueCharacter(configLineTrimmed[i])) return ELineClassification::Error;
 
         // Skip over the value setting characters that follow.
-        for (i += 1; i < configLine.length() && IsAllowedValueCharacter(configLine[i]); ++i)
+        for (i += 1;
+             i < configLineTrimmed.length() && IsAllowedValueCharacter(configLineTrimmed[i]);
+             ++i)
           ;
 
         // Verify that the remainder of the line is just whitespace.
-        for (; i < configLine.length(); ++i)
+        for (; i < configLineTrimmed.length(); ++i)
         {
-          if (!iswblank(configLine[i])) return ELineClassification::Error;
+          if (!std::iswblank(configLineTrimmed[i])) return ELineClassification::Error;
         }
 
         return ELineClassification::Value;
@@ -407,12 +484,49 @@ namespace Infra
       return ELineClassification::Error;
     }
 
-    /// Parses a Boolean from the supplied input string.
+    /// Parses a value from the supplied input string. Default implementation does nothing and
+    /// always fails.
+    /// @param [in] source String from which to parse.
+    /// @param [out] dest Filled with the result of the parse.
+    /// @return `false` because this is the default implementation that does nothing.
+    template <typename ValueType> bool ParseTypedValue(std::wstring_view source, ValueType& dest)
+    {
+      return false;
+    }
+
+    /// Parses a signed integer value from the supplied input string.
     /// @param [in] source String from which to parse.
     /// @param [out] dest Filled with the result of the parse.
     /// @return `true` if the parse was successful and able to consume the whole string, `false`
     /// otherwise.
-    static bool ParseBoolean(const std::wstring_view source, TBooleanValue& dest)
+    template <> bool ParseTypedValue(std::wstring_view source, TIntegerValue& dest)
+    {
+      intmax_t value = 0;
+      wchar_t* endptr = nullptr;
+
+      // Parse out a number in any representable base.
+      value = wcstoll(source.data(), &endptr, 0);
+
+      // Verify that the number is not out of range.
+      if (ERANGE == errno && (LLONG_MIN == value || LLONG_MAX == value)) return false;
+      if ((value > std::numeric_limits<TIntegerValue>::max()) ||
+          (value < std::numeric_limits<TIntegerValue>::min()))
+        return false;
+
+      // Verify that the whole string was consumed. This uses pointer arithmetic, and so the logic
+      // holds regardless of the size of the individual characters.
+      if (source.length() != (endptr - source.data())) return false;
+
+      dest = static_cast<TIntegerValue>(value);
+      return true;
+    }
+
+    /// Parses a Boolean value from the supplied input string.
+    /// @param [in] source String from which to parse.
+    /// @param [out] dest Filled with the result of the parse.
+    /// @return `true` if the parse was successful and able to consume the whole string, `false`
+    /// otherwise.
+    template <> bool ParseTypedValue(std::wstring_view source, TBooleanValue& dest)
     {
       static constexpr std::wstring_view kTrueStrings[] = {
           L"t", L"true", L"on", L"y", L"yes", L"enabled", L"1"};
@@ -442,30 +556,13 @@ namespace Infra
       return false;
     }
 
-    /// Parses a signed integer value from the supplied input string.
+    /// Parses a string value from the supplied input string. This is a no-op.
     /// @param [in] source String from which to parse.
     /// @param [out] dest Filled with the result of the parse.
-    /// @return `true` if the parse was successful and able to consume the whole string, `false`
-    /// otherwise.
-    static bool ParseInteger(std::wstring_view source, TIntegerValue& dest)
+    /// @return `true` because string parsing to a string is a no-op.
+    template <> bool ParseTypedValue(std::wstring_view source, TStringValue& dest)
     {
-      intmax_t value = 0;
-      wchar_t* endptr = nullptr;
-
-      // Parse out a number in any representable base.
-      value = wcstoll(source.data(), &endptr, 0);
-
-      // Verify that the number is not out of range.
-      if (ERANGE == errno && (LLONG_MIN == value || LLONG_MAX == value)) return false;
-      if ((value > std::numeric_limits<TIntegerValue>::max()) ||
-          (value < std::numeric_limits<TIntegerValue>::min()))
-        return false;
-
-      // Verify that the whole string was consumed. This uses pointer arithmetic, and so the logic
-      // holds regardless of the size of the individual characters.
-      if (source.length() != (endptr - source.data())) return false;
-
-      dest = (TIntegerValue)value;
+      dest = source;
       return true;
     }
 
@@ -477,6 +574,10 @@ namespace Infra
     static void ParseNameAndValue(
         std::wstring_view configLine, std::wstring_view& nameString, std::wstring_view& valueString)
     {
+      DebugAssert(
+          std::wstring_view::npos != configLine.find_first_of(L'='),
+          "Attempting to parse a name/value pair from a line that does not contain one.");
+
       const size_t equalSignPosition = configLine.find_first_of(L'=');
       nameString = Strings::TrimWhitespace(configLine.substr(0, equalSignPosition));
       valueString = Strings::TrimWhitespace(configLine.substr(1 + equalSignPosition));
@@ -488,6 +589,12 @@ namespace Infra
     /// @param String containing the name of the configuration section.
     static std::wstring_view ParseSection(std::wstring_view configLine)
     {
+      DebugAssert(
+          ((std::wstring_view::npos != configLine.find_first_of(L'[')) &&
+           (std::wstring_view::npos != configLine.find_first_of(L']')) &&
+           (configLine.find_first_of(L']') > configLine.find_first_of(L'['))),
+          "Attempting to parse a section name from a line that does not contain one.");
+
       std::wstring_view parsedSection = configLine;
       parsedSection.remove_prefix(1 + configLine.find_first_of(L'['));
       parsedSection.remove_suffix(configLine.length() - configLine.find_first_of(L']'));
@@ -825,6 +932,140 @@ namespace Infra
       return ReadConfiguration(std::move(memoryBufferReader));
     }
 
+    void ConfigurationFileReader::ParseAndMaybeInsertSection(
+        const ConfigSourceReaderBase* reader,
+        ConfigurationData& configToFill,
+        std::wstring_view configLineTrimmed,
+        std::set<std::wstring, Strings::CaseInsensitiveLessThanComparator<wchar_t>>& seenSections,
+        std::wstring_view& currentSection,
+        bool& skipValueLines)
+    {
+      std::wstring_view section = ParseSection(configLineTrimmed);
+      if (0 != seenSections.count(section))
+      {
+        AppendErrorMessage(Strings::Format(
+            L"%.*s(%u): %.*s: Duplicated section name.",
+            static_cast<int>(reader->GetConfigSourceName().length()),
+            reader->GetConfigSourceName().data(),
+            reader->GetLastReadConfigLineNumber(),
+            static_cast<int>(section.length()),
+            section.data()));
+        skipValueLines = true;
+        return;
+      }
+
+      const Action sectionAction = ActionForSection(section);
+      switch (sectionAction.GetAction())
+      {
+        case EAction::Error:
+          if (true == sectionAction.HasErrorMessage())
+            AppendErrorMessage(Strings::Format(
+                L"%.*s(%u): %s",
+                static_cast<int>(reader->GetConfigSourceName().length()),
+                reader->GetConfigSourceName().data(),
+                reader->GetLastReadConfigLineNumber(),
+                sectionAction.GetErrorMessage().c_str()));
+          else
+            AppendErrorMessage(Strings::Format(
+                L"%.*s(%u): %.*s: Unrecognized section name.",
+                static_cast<int>(reader->GetConfigSourceName().length()),
+                reader->GetConfigSourceName().data(),
+                reader->GetLastReadConfigLineNumber(),
+                static_cast<int>(section.length()),
+                section.data()));
+          skipValueLines = true;
+          break;
+
+        case EAction::Process:
+          currentSection = *(seenSections.emplace(section).first);
+          skipValueLines = false;
+          break;
+
+        case EAction::Skip:
+          skipValueLines = true;
+          break;
+
+        default:
+          AppendErrorMessage(Strings::Format(
+              L"%.*s(%u): Internal error while processing section name.",
+              static_cast<int>(reader->GetConfigSourceName().length()),
+              reader->GetConfigSourceName().data(),
+              reader->GetLastReadConfigLineNumber()));
+          skipValueLines = true;
+          break;
+      }
+    }
+
+    template <typename ValueType> void ConfigurationFileReader::ParseAndMaybeInsertValue(
+        const ConfigSourceReaderBase* reader,
+        ConfigurationData& configToFill,
+        std::wstring_view section,
+        std::wstring_view name,
+        EValueType valueType,
+        std::wstring_view valueUnparsed)
+    {
+      ValueType valueParsed{};
+      if (false == ParseTypedValue(valueUnparsed, valueParsed))
+      {
+        std::wstring_view typeString = TypeToString(ValueTypeToSingleValueEnumerator<ValueType>());
+        AppendErrorMessage(Strings::Format(
+            L"%.*s(%u): %.*s: Failed to parse %.*s value.",
+            static_cast<int>(reader->GetConfigSourceName().length()),
+            reader->GetConfigSourceName().data(),
+            reader->GetLastReadConfigLineNumber(),
+            static_cast<int>(valueUnparsed.length()),
+            valueUnparsed.data(),
+            static_cast<int>(typeString.length()),
+            typeString.data()));
+        return;
+      }
+
+      const Action valueAction = ActionForValue(section, name, valueParsed);
+      switch (valueAction.GetAction())
+      {
+        case EAction::Error:
+          if (true == valueAction.HasErrorMessage())
+            AppendErrorMessage(Strings::Format(
+                L"%.*s(%u): %s",
+                static_cast<int>(reader->GetConfigSourceName().length()),
+                reader->GetConfigSourceName().data(),
+                reader->GetLastReadConfigLineNumber(),
+                valueAction.GetErrorMessage().c_str()));
+          else
+            AppendErrorMessage(Strings::Format(
+                L"%.*s(%u): %.*s: Invalid value for configuration setting %.*s.",
+                static_cast<int>(reader->GetConfigSourceName().length()),
+                reader->GetConfigSourceName().data(),
+                reader->GetLastReadConfigLineNumber(),
+                static_cast<int>(valueUnparsed.length()),
+                valueUnparsed.data(),
+                static_cast<int>(name.length()),
+                name.data()));
+          break;
+
+        case EAction::Process:
+          if (false ==
+              configToFill.Insert(
+                  section,
+                  name,
+                  Value(
+                      std::move(valueParsed),
+                      valueType,
+                      reader->GetConfigSourceName(),
+                      reader->GetLastReadConfigLineNumber())))
+            AppendErrorMessage(Strings::Format(
+                L"%.*s(%u): %.*s: Duplicated value for configuration setting %.*s.",
+                static_cast<int>(reader->GetConfigSourceName().length()),
+                reader->GetConfigSourceName().data(),
+                reader->GetLastReadConfigLineNumber(),
+                static_cast<int>(valueUnparsed.length()),
+                valueUnparsed.data(),
+                static_cast<int>(name.length()),
+                name.data()));
+          break;
+      }
+    }
+
     ConfigurationData ConfigurationFileReader::ReadConfiguration(
         std::unique_ptr<ConfigSourceReaderBase>&& reader)
     {
@@ -834,7 +1075,7 @@ namespace Infra
 
       // Parse the configuration file, one line at a time.
       std::set<std::wstring, Strings::CaseInsensitiveLessThanComparator<wchar_t>> seenSections;
-      std::wstring_view thisSection = kSectionNameGlobal;
+      std::wstring_view currentSection = kSectionNameGlobal;
 
       TemporaryString configLine;
       bool configLineReadResult = reader->ReadLine(configLine);
@@ -842,9 +1083,9 @@ namespace Infra
 
       while (true == configLineReadResult)
       {
-        configLine.TrimTrailingWhitespace();
+        std::wstring_view configLineTrimmed = Strings::TrimWhitespace(configLine.AsStringView());
 
-        switch (ClassifyConfigurationFileLine(configLine))
+        switch (ClassifyConfigurationFileLine(configLineTrimmed))
         {
           case ELineClassification::Error:
             AppendErrorMessage(Strings::Format(
@@ -858,105 +1099,42 @@ namespace Infra
             break;
 
           case ELineClassification::Section:
-          {
-            std::wstring_view section = ParseSection(configLine);
-
-            if (0 != seenSections.count(section))
-            {
-              AppendErrorMessage(Strings::Format(
-                  L"%.*s(%u): %.*s: Duplicated section name.",
-                  static_cast<int>(reader->GetConfigSourceName().length()),
-                  reader->GetConfigSourceName().data(),
-                  reader->GetLastReadConfigLineNumber(),
-                  static_cast<int>(section.length()),
-                  section.data()));
-              skipValueLines = true;
-              break;
-            }
-
-            const Action sectionAction = ActionForSection(section);
-            switch (sectionAction.GetAction())
-            {
-              case EAction::Error:
-                if (true == sectionAction.HasErrorMessage())
-                  AppendErrorMessage(Strings::Format(
-                      L"%.*s(%u): %s",
-                      static_cast<int>(reader->GetConfigSourceName().length()),
-                      reader->GetConfigSourceName().data(),
-                      reader->GetLastReadConfigLineNumber(),
-                      sectionAction.GetErrorMessage().c_str()));
-                else
-                  AppendErrorMessage(Strings::Format(
-                      L"%.*s(%u): %.*s: Unrecognized section name.",
-                      static_cast<int>(reader->GetConfigSourceName().length()),
-                      reader->GetConfigSourceName().data(),
-                      reader->GetLastReadConfigLineNumber(),
-                      static_cast<int>(section.length()),
-                      section.data()));
-                skipValueLines = true;
-                break;
-
-              case EAction::Process:
-                thisSection = *(seenSections.emplace(section).first);
-                skipValueLines = false;
-                break;
-
-              case EAction::Skip:
-                skipValueLines = true;
-                break;
-
-              default:
-                AppendErrorMessage(Strings::Format(
-                    L"%.*s(%u): Internal error while processing section name.",
-                    static_cast<int>(reader->GetConfigSourceName().length()),
-                    reader->GetConfigSourceName().data(),
-                    reader->GetLastReadConfigLineNumber()));
-                skipValueLines = true;
-                break;
-            }
+            ParseAndMaybeInsertSection(
+                reader.get(),
+                configToFill,
+                configLineTrimmed,
+                seenSections,
+                currentSection,
+                skipValueLines);
             break;
-          }
 
           case ELineClassification::Value:
             if (false == skipValueLines)
             {
               std::wstring_view name;
               std::wstring_view value;
-              ParseNameAndValue(configLine, name, value);
+              ParseNameAndValue(configLineTrimmed, name, value);
 
-              const auto& existingName = configToFill[thisSection][name];
+              const auto& existingName = configToFill[currentSection][name];
               const EValueType valueType =
                   (existingName.HasValue() ? existingName.GetType()
-                                           : TypeForValue(thisSection, name));
-              bool shouldParseValue = true;
+                                           : TypeForValue(currentSection, name));
 
               // If the value type does not identify it as multi-valued, make sure
               // this is the first time the setting is seen.
-              switch (valueType)
+              if ((false == TypeAllowsMultipleValues(valueType)) &&
+                  (configToFill.Contains(currentSection, name)))
               {
-                case EValueType::Integer:
-                case EValueType::Boolean:
-                case EValueType::String:
-                  if (configToFill.Contains(thisSection, name))
-                  {
-                    AppendErrorMessage(Strings::Format(
-                        L"%.*s(%u): %.*s: Only a single value is allowed for this setting.",
-                        static_cast<int>(reader->GetConfigSourceName().length()),
-                        reader->GetConfigSourceName().data(),
-                        reader->GetLastReadConfigLineNumber(),
-                        static_cast<int>(name.length()),
-                        name.data()));
-                    shouldParseValue = false;
-                  }
-                  break;
-
-                default:
-                  break;
+                AppendErrorMessage(Strings::Format(
+                    L"%.*s(%u): %.*s: Only a single value is allowed for this setting.",
+                    static_cast<int>(reader->GetConfigSourceName().length()),
+                    reader->GetConfigSourceName().data(),
+                    reader->GetLastReadConfigLineNumber(),
+                    static_cast<int>(name.length()),
+                    name.data()));
+                break;
               }
 
-              if (false == shouldParseValue) break;
-
-              // Attempt to parse the value.
               switch (valueType)
               {
                 case EValueType::Error:
@@ -971,181 +1149,21 @@ namespace Infra
 
                 case EValueType::Integer:
                 case EValueType::IntegerMultiValue:
-                {
-                  TIntegerValue intValue = (TIntegerValue)0;
-
-                  if (false == ParseInteger(value, intValue))
-                  {
-                    AppendErrorMessage(Strings::Format(
-                        L"%.*s(%u): %.*s: Failed to parse integer value.",
-                        static_cast<int>(reader->GetConfigSourceName().length()),
-                        reader->GetConfigSourceName().data(),
-                        reader->GetLastReadConfigLineNumber(),
-                        static_cast<int>(value.length()),
-                        value.data()));
-                    break;
-                  }
-
-                  const Action valueAction = ActionForValue(thisSection, name, intValue);
-                  switch (valueAction.GetAction())
-                  {
-                    case EAction::Error:
-                      if (true == valueAction.HasErrorMessage())
-                        AppendErrorMessage(Strings::Format(
-                            L"%.*s(%u): %s",
-                            static_cast<int>(reader->GetConfigSourceName().length()),
-                            reader->GetConfigSourceName().data(),
-                            reader->GetLastReadConfigLineNumber(),
-                            valueAction.GetErrorMessage().c_str()));
-                      else
-                        AppendErrorMessage(Strings::Format(
-                            L"%.*s(%u): %.*s: Invalid value for configuration setting %.*s.",
-                            static_cast<int>(reader->GetConfigSourceName().length()),
-                            reader->GetConfigSourceName().data(),
-                            reader->GetLastReadConfigLineNumber(),
-                            static_cast<int>(value.length()),
-                            value.data(),
-                            static_cast<int>(name.length()),
-                            name.data()));
-                      break;
-
-                    case EAction::Process:
-                      if (false ==
-                          configToFill.Insert(
-                              thisSection,
-                              name,
-                              Value(
-                                  TIntegerValue(intValue),
-                                  valueType,
-                                  reader->GetConfigSourceName(),
-                                  reader->GetLastReadConfigLineNumber())))
-                        AppendErrorMessage(Strings::Format(
-                            L"%.*s(%u): %.*s: Duplicated value for configuration setting %.*s.",
-                            static_cast<int>(reader->GetConfigSourceName().length()),
-                            reader->GetConfigSourceName().data(),
-                            reader->GetLastReadConfigLineNumber(),
-                            static_cast<int>(value.length()),
-                            value.data(),
-                            static_cast<int>(name.length()),
-                            name.data()));
-                      break;
-                  }
+                  ParseAndMaybeInsertValue<TIntegerValue>(
+                      reader.get(), configToFill, currentSection, name, valueType, value);
                   break;
-                }
 
                 case EValueType::Boolean:
                 case EValueType::BooleanMultiValue:
-                {
-                  TBooleanValue boolValue = (TBooleanValue) false;
-
-                  if (false == ParseBoolean(value, boolValue))
-                  {
-                    AppendErrorMessage(Strings::Format(
-                        L"%.*s(%u): %.*s: Failed to parse Boolean value.",
-                        static_cast<int>(reader->GetConfigSourceName().length()),
-                        reader->GetConfigSourceName().data(),
-                        reader->GetLastReadConfigLineNumber(),
-                        static_cast<int>(value.length()),
-                        value.data()));
-                    break;
-                  }
-
-                  const Action valueAction = ActionForValue(thisSection, name, boolValue);
-                  switch (valueAction.GetAction())
-                  {
-                    case EAction::Error:
-                      if (true == valueAction.HasErrorMessage())
-                        AppendErrorMessage(Strings::Format(
-                            L"%.*s(%u): %s",
-                            static_cast<int>(reader->GetConfigSourceName().length()),
-                            reader->GetConfigSourceName().data(),
-                            reader->GetLastReadConfigLineNumber(),
-                            valueAction.GetErrorMessage().c_str()));
-                      else
-                        AppendErrorMessage(Strings::Format(
-                            L"%.*s(%u): %.*s: Invalid value for configuration setting %.*s.",
-                            static_cast<int>(reader->GetConfigSourceName().length()),
-                            reader->GetConfigSourceName().data(),
-                            reader->GetLastReadConfigLineNumber(),
-                            static_cast<int>(value.length()),
-                            value.data(),
-                            static_cast<int>(name.length()),
-                            name.data()));
-                      break;
-
-                    case EAction::Process:
-                      if (false ==
-                          configToFill.Insert(
-                              thisSection,
-                              name,
-                              Value(
-                                  TBooleanValue(boolValue),
-                                  valueType,
-                                  reader->GetConfigSourceName(),
-                                  reader->GetLastReadConfigLineNumber())))
-                        AppendErrorMessage(Strings::Format(
-                            L"%.*s(%u): %.*s: Duplicated value for configuration setting %.*s.",
-                            static_cast<int>(reader->GetConfigSourceName().length()),
-                            reader->GetConfigSourceName().data(),
-                            reader->GetLastReadConfigLineNumber(),
-                            static_cast<int>(value.length()),
-                            value.data(),
-                            static_cast<int>(name.length()),
-                            name.data()));
-                      break;
-                  }
+                  ParseAndMaybeInsertValue<TBooleanValue>(
+                      reader.get(), configToFill, currentSection, name, valueType, value);
                   break;
-                }
 
                 case EValueType::String:
                 case EValueType::StringMultiValue:
-                {
-                  const Action valueAction = ActionForValue(thisSection, name, value);
-                  switch (valueAction.GetAction())
-                  {
-                    case EAction::Error:
-                      if (true == valueAction.HasErrorMessage())
-                        AppendErrorMessage(Strings::Format(
-                            L"%.*s(%u): %s",
-                            static_cast<int>(reader->GetConfigSourceName().length()),
-                            reader->GetConfigSourceName().data(),
-                            reader->GetLastReadConfigLineNumber(),
-                            valueAction.GetErrorMessage().c_str()));
-                      else
-                        AppendErrorMessage(Strings::Format(
-                            L"%.*s(%u): %.*s: Invalid value for configuration setting %.*s.",
-                            static_cast<int>(reader->GetConfigSourceName().length()),
-                            reader->GetConfigSourceName().data(),
-                            reader->GetLastReadConfigLineNumber(),
-                            static_cast<int>(value.length()),
-                            value.data(),
-                            static_cast<int>(name.length()),
-                            name.data()));
-                      break;
-
-                    case EAction::Process:
-                      if (false ==
-                          configToFill.Insert(
-                              thisSection,
-                              name,
-                              Value(
-                                  TStringValue(value),
-                                  valueType,
-                                  reader->GetConfigSourceName(),
-                                  reader->GetLastReadConfigLineNumber())))
-                        AppendErrorMessage(Strings::Format(
-                            L"%.*s(%u): %.*s: Duplicated value for configuration setting %.*s.",
-                            static_cast<int>(reader->GetConfigSourceName().length()),
-                            reader->GetConfigSourceName().data(),
-                            reader->GetLastReadConfigLineNumber(),
-                            static_cast<int>(value.length()),
-                            value.data(),
-                            static_cast<int>(name.length()),
-                            name.data()));
-                      break;
-                  }
+                  ParseAndMaybeInsertValue<TStringValue>(
+                      reader.get(), configToFill, currentSection, name, valueType, value);
                   break;
-                }
 
                 default:
                   AppendErrorMessage(Strings::Format(
@@ -1167,7 +1185,6 @@ namespace Infra
             break;
         }
 
-        configLine.Clear();
         configLineReadResult = reader->ReadLine(configLine);
       }
 
