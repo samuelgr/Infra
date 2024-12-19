@@ -100,7 +100,7 @@ namespace Infra
 
     /// Interface for reading from a configuration file. Abstracts away the details of reading from
     /// various sources, including files and memory buffers. For internal use only.
-    class IConfigSourceReader;
+    class ConfigSourceReaderBase;
 
     /// Fully defines an action to take in response to a section or a value being read. Combines an
     /// action with a possible error message.
@@ -1069,7 +1069,7 @@ namespace Infra
       /// process.
       /// @param [in] configSourceName Name associated with the source of the configuration
       /// file data that can be used to identify it in logs and error messages.
-      ConfigurationData ReadConfiguration(std::unique_ptr<IConfigSourceReader>&& reader);
+      ConfigurationData ReadConfiguration(std::unique_ptr<ConfigSourceReaderBase>&& reader);
 
       /// Holds the error messages that describes any errors that occurred during
       /// configuration file read.
