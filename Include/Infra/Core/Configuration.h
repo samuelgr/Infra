@@ -1061,6 +1061,13 @@ namespace Infra
 
     private:
 
+      /// Type alias for a container that keeps track of section names that have already been seen.
+      using TSeenSections =
+          std::set<std::wstring, Strings::CaseInsensitiveLessThanComparator<wchar_t>>;
+
+      /// Internal structure for holding the state of an overall configuration file read operation.
+      struct SReadState;
+
       /// Appends an error message into the list of error messages associated with the file read
       /// attempt. Each such error message is a semantically-rich description of an error that
       /// occurred during the configuration file read attempt that fills this object.
@@ -1069,26 +1076,11 @@ namespace Infra
       /// Internal implementation of parsing, querying subclasses for the desired action, and
       /// possibly inserting a section read from a configuration file into a configuration data
       /// object.
-      /// @param [in] reader Low-level configuration source reader object, borrowed from the caller
-      /// for querying only.
-      /// @param [in,out] configToFill Configuration data object into which to attempt to insert the
-      /// parsed configuration value.
+      /// @param [in,out] readState Structure that keeps track of the state of the overall read
+      /// operation.
       /// @param [in] configLineTrimmed Unparsed configuration line, as read from the configuration
       /// file, with whitespace trimmed.
-      /// @param [in,out] seenSections Set of all section names seen before this one. Used to check
-      /// for duplicates, and on return, will contain the newly-parsed section name.
-      /// @param [in,out] currentSection Name of the current section. On return, updated with the
-      /// newly-parsed section name.
-      /// @param [out] skipValueLines Written to inform the caller whether or not the section is
-      /// being skipped. If set to `true` then the upcoming name/value pair lines, if any, should be
-      /// skipped that belong to the current section.
-      void ParseAndMaybeInsertSection(
-          const ConfigSourceReaderBase* reader,
-          ConfigurationData& configToFill,
-          std::wstring_view configLineTrimmed,
-          std::set<std::wstring, Strings::CaseInsensitiveLessThanComparator<wchar_t>>& seenSections,
-          std::wstring_view& currentSection,
-          bool& skipValueLines);
+      void ParseAndMaybeInsertSection(SReadState& readState, std::wstring_view configLineTrimmed);
 
       /// Internal implementation of parsing, querying subclasses for the desired action, and
       /// possibly inserting a value read from a configuration file into a configuration data
@@ -1105,7 +1097,7 @@ namespace Infra
       /// single- or multi-valued to be specified.
       /// @param [in] valueUnparsed Unparsed value read directly from the configuration file.
       template <typename ValueType> void ParseAndMaybeInsertValue(
-          const ConfigSourceReaderBase* reader,
+          const ConfigSourceReaderBase& reader,
           ConfigurationData& configToFill,
           std::wstring_view section,
           std::wstring_view name,
@@ -1113,10 +1105,9 @@ namespace Infra
           std::wstring_view valueUnparsed);
 
       /// Internal implementation of reading and parsing configuration files from any source.
-      /// @param [in] reader Low-level configuration source reader object.
-      /// @param [in] configSourceName Name associated with the source of the configuration
-      /// file data that can be used to identify it in logs and error messages.
-      ConfigurationData ReadConfiguration(std::unique_ptr<ConfigSourceReaderBase>&& reader);
+      /// @param [in,out] readState Structure that keeps track of the state of the overall read
+      /// operation.
+      void ReadConfigurationInternal(SReadState& readState);
 
       /// Holds the error messages that describes any errors that occurred during
       /// configuration file read.
