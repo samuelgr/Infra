@@ -306,7 +306,7 @@ namespace Infra
     inline void PopBack(void)
     {
       DebugAssert(size > 0, "Attempting to remove from an empty container.");
-      (*this)[size--].~T();
+      (*this)[--size].~T();
     }
 
     /// Appends the specified element to the end of this container using copy semantics.

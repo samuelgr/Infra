@@ -12,12 +12,39 @@
 
 #include "Core/TemporaryBuffer.h"
 
+#include <memory>
+#include <type_traits>
+
 #include "Test/TestCase.h"
 #include "Test/Utilities.h"
 
 namespace CoreInfraTest
 {
   using namespace ::Infra;
+
+  /// Test object for verifying that the destructor was invoked, which is a proxy for checking if
+  /// the object was properly destroyed.
+  class NonTriviallyDestructibleTestObject
+  {
+  public:
+
+    inline NonTriviallyDestructibleTestObject(int* destructorInvocationCounter)
+        : destructorInvocationCounter(destructorInvocationCounter)
+    {}
+
+    ~NonTriviallyDestructibleTestObject(void)
+    {
+      (*destructorInvocationCounter) += 1;
+    }
+
+  private:
+
+    int* destructorInvocationCounter;
+  };
+
+  static_assert(
+      false == true == std::is_trivially_destructible_v<NonTriviallyDestructibleTestObject>,
+      "Non-trivially destructible test object type is actually detected as trivially destructible.");
 
   // Verifies that temporary buffers correctly report their capacities.
   TEST_CASE(TemporaryBuffer_Capacity)
@@ -127,6 +154,22 @@ namespace CoreInfraTest
 
     for (unsigned int i = 0; i < testVector2.Size(); ++i)
       TEST_ASSERT((11 * (i + 1)) == testVector2[i]);
+  }
+
+  // Verifies that a vector correctly empties its contents and destroys each object when it is
+  // cleared and its contents are not trivially-destructible.
+  TEST_CASE(TemporaryVector_Clear_NonTriviallyDestructible)
+  {
+    constexpr int expectedNumDestructorInvocations = 10;
+    int actualNumDestructorInvocations = 0;
+
+    TemporaryVector<std::unique_ptr<NonTriviallyDestructibleTestObject>> testVector;
+    for (int i = 0; i < expectedNumDestructorInvocations; ++i)
+      testVector.EmplaceBack(
+          std::make_unique<NonTriviallyDestructibleTestObject>(&actualNumDestructorInvocations));
+
+    testVector.Clear();
+    TEST_ASSERT(actualNumDestructorInvocations == expectedNumDestructorInvocations);
   }
 
   // Verifies that a temporary string can have multiple different data types correctly appended.
