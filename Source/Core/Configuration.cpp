@@ -1057,7 +1057,7 @@ namespace Infra
     }
 
     void ConfigurationFileReader::LogAllErrorMessages(
-        Message::ESeverity severity, int indentNumSpaces) const
+        int indentNumSpaces, Message::ESeverity severity) const
     {
       if ((true == HasErrorMessages()) && (true == Message::WillOutputMessageOfSeverity(severity)))
       {

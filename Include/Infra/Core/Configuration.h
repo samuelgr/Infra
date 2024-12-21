@@ -956,11 +956,11 @@ namespace Infra
       }
 
       /// Outputs all error messages to the log, if it is enabled for the specified severity.
-      /// @param [in] severity Severity of each generated log message. Defaults to error.
       /// @param [in] indentNumSpaces Number of spaces to indent each generated log message.
-      /// Defaults to 0.
+      /// Defaults to 2.
+      /// @param [in] severity Severity of each generated log message. Defaults to error.
       void LogAllErrorMessages(
-          Message::ESeverity severity = Message::ESeverity::Error, int indentNumSpaces = 0) const;
+          int indentNumSpaces = 2, Message ::ESeverity severity = Message::ESeverity::Error) const;
 
       /// Reads and parses a configuration file, storing the settings in the supplied
       /// configuration object. Intended to be invoked externally. Subclasses should not
