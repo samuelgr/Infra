@@ -49,6 +49,11 @@ namespace Infra
 {
   namespace Configuration
   {
+    /// Generates and returns the recommended file path for a configuration file. This is just the
+    /// product name plus the .ini extension located in the same directory as this module.
+    /// @return Recommended configuration filename.
+    std::wstring_view RecommendedConfigurationFilePath(void);
+
     /// Section name for all settings that appear at global scope (i.e. outside of a section).
     inline constexpr std::wstring_view kSectionNameGlobal = L"";
 
@@ -965,13 +970,15 @@ namespace Infra
       /// Reads and parses a configuration file, storing the settings in the supplied
       /// configuration object. Intended to be invoked externally. Subclasses should not
       /// override this method.
-      /// @param [in] configFileName Name of the configuration file to read.
+      /// @param [in] configFileName Name of the configuration file to read. Defaults to the
+      /// recommended configuration filename.
       /// @param [in] mustExist Indicates that it is an error for the configuration file not
       /// to exist. This requirement is unusual, so the default behavior is not to require it.
       /// @return Configuration data object filled based on the contents of the configuration
       /// file.
       ConfigurationData ReadConfigurationFile(
-          std::wstring_view configFileName, bool mustExist = false);
+          std::wstring_view configFileName = RecommendedConfigurationFilePath(),
+          bool mustExist = false);
 
       /// Reads and parses a configuration file held in memory, storing the settings in the
       /// supplied configuration object. Intended to be invoked externally, primarily by

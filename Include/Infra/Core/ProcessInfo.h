@@ -5,7 +5,7 @@
  * Authored by Samuel Grossman
  * Copyright (c) 2016-2024
  ***********************************************************************************************//**
- * @file Globals.h
+ * @file ProcessInfo.h
  *   Declaration of functionality related to getting information about the running process.
  **************************************************************************************************/
 
@@ -153,11 +153,6 @@ namespace Infra
     /// dynamically-linked library.
     /// @return Instance handle for this code.
     HINSTANCE GetThisModuleInstanceHandle(void);
-
-    /// Retrieves information on the current system. This includes architecture, page size, and
-    /// so on.
-    /// @return Reference to a read-only structure containing system information.
-    const SYSTEM_INFO& GetSystemInformation(void);
 
     /// Retrieves and returns version information for this running instance of the Infra library.
     /// @return Version information structure for the Infra library.

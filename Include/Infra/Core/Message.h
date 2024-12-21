@@ -21,6 +21,12 @@ namespace Infra
 {
   namespace Message
   {
+    /// Generates and returns the recommended file path for a log file. This is a combination of the
+    /// product name, PID, executable base name, and the .log extension, placed in the current
+    /// user's desktop directory.
+    /// @return Recommended log filename.
+    std::wstring_view RecommendedLogFilePath(void);
+
     /// Enumerates all supported severity levels for messages.
     /// These are primarily used to assist with output formatting.
     enum class ESeverity
@@ -78,12 +84,9 @@ namespace Infra
     /// Attempts to create and enable the log file.
     /// Will generate an error message on failure.
     /// Once logging to a file is enabled, it cannot be disabled.
-    /// @param [in] logFilename Filename of the log file to be created.
-    /// @param [in] productName Product name to be included in the log file header. Defaults
-    /// automatically to the base name of the module containing this code.
-    /// @param [in] productVersion Optional product version to be included in the log file header.
-    /// Defaults to being omitted entirely.
-    void CreateAndEnableLogFile(std::wstring_view logFilename);
+    /// @param [in] logFilename Filename of the log file to be created. Defaults to the recommended
+    /// log filename.
+    void CreateAndEnableLogFile(std::wstring_view logFilename = RecommendedLogFilePath());
 
     /// Checks if logging to a file is enabled.
     /// @return `true` if so, `false` if not.

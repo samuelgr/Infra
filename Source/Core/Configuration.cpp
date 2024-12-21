@@ -19,6 +19,7 @@
 #include <cstring>
 #include <limits>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <set>
 #include <sstream>
@@ -30,6 +31,7 @@
 
 #include "Core/DebugAssert.h"
 #include "Core/Message.h"
+#include "Core/ProcessInfo.h"
 #include "Core/Strings.h"
 #include "Core/TemporaryBuffer.h"
 
@@ -37,6 +39,34 @@ namespace Infra
 {
   namespace Configuration
   {
+    std::wstring_view RecommendedConfigurationFilePath(void)
+    {
+      static std::wstring recommendedConfigurationFilePath;
+      static std::once_flag initFlag;
+
+      std::call_once(
+          initFlag,
+          []() -> void
+          {
+            std::wstring_view pieces[] = {
+                ProcessInfo::GetThisModuleDirectoryName(),
+                L"\\",
+                ProcessInfo::GetProductName(),
+                L".ini"};
+
+            size_t totalLength = 0;
+            for (int i = 0; i < _countof(pieces); ++i)
+              totalLength += pieces[i].length();
+
+            recommendedConfigurationFilePath.reserve(1 + totalLength);
+
+            for (int i = 0; i < _countof(pieces); ++i)
+              recommendedConfigurationFilePath.append(pieces[i]);
+          });
+
+      return recommendedConfigurationFilePath;
+    }
+
     /// Enumerates all possible classifications of configuration file lines. Used during parsing to
     /// classify each line encountered.
     enum class ELineClassification

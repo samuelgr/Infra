@@ -22,3 +22,6 @@
 #include <windows.h>
 
 // clang-format on
+
+#include <knownfolders.h>
+#include <shlobj.h>

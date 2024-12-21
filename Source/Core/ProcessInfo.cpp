@@ -64,21 +64,6 @@ namespace Infra
       return instanceHandle;
     }
 
-    const SYSTEM_INFO& GetSystemInformation(void)
-    {
-      static SYSTEM_INFO systemInformation;
-      static std::once_flag initFlag;
-
-      std::call_once(
-          initFlag,
-          []() -> void
-          {
-            GetNativeSystemInfo(&systemInformation);
-          });
-
-      return systemInformation;
-    }
-
     SVersionInfo GetInfraVersion(void)
     {
       return GitVersionInfoForCurrentProject();

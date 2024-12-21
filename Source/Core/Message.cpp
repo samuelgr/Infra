@@ -30,6 +30,37 @@ namespace Infra
 {
   namespace Message
   {
+    std::wstring_view RecommendedLogFilePath(void)
+    {
+      static std::wstring recommendedLogFilePath;
+      static std::once_flag initFlag;
+
+      std::call_once(
+          initFlag,
+          []() -> void
+          {
+            Infra::TemporaryString logFilename;
+
+            PWSTR knownFolderPath;
+            const HRESULT result =
+                SHGetKnownFolderPath(FOLDERID_Desktop, 0, nullptr, &knownFolderPath);
+
+            if (S_OK == result)
+            {
+              logFilename << knownFolderPath << L'\\';
+              CoTaskMemFree(knownFolderPath);
+            }
+
+            logFilename << ProcessInfo::GetProductName() << L'_'
+                        << ProcessInfo::GetExecutableBaseName() << L'_'
+                        << ProcessInfo::GetCurrentProcessId() << L".log";
+
+            recommendedLogFilePath.assign(logFilename);
+          });
+
+      return recommendedLogFilePath;
+    }
+
     /// Enumerates all supported modes of outputting messages.
     enum class EOutputMode
     {
