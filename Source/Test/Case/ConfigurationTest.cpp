@@ -1013,6 +1013,10 @@ namespace CoreInfraTest
         testConfigReader.ReadInMemoryConfigurationFile(configFile1);
     PrintReadErrorMessages(testConfigReader);
     TEST_ASSERT(true == testConfigReader.HasErrorMessages());
-    return;
+
+    // The first error message should be about a cycle.
+    TEST_ASSERT(
+        (true == testConfigReader.GetErrorMessages().front().contains(L"Cyclical")) ||
+        (true == testConfigReader.GetErrorMessages().front().contains(L"cyclical")));
   }
 } // namespace CoreInfraTest
