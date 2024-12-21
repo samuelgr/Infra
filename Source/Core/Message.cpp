@@ -364,7 +364,7 @@ namespace Infra
       if (false == IsLogFileEnabled())
       {
         // Open the log file.
-        if (0 != _wfopen_s(&logFileHandle, logFilename.data(), L"w"))
+        if (0 != _wfopen_s(&logFileHandle, logFilename.data(), L"w,ccs=UTF-8"))
         {
           logFileHandle = nullptr;
           OutputFormatted(ESeverity::Error, L"%s - Unable to create log file.", logFilename.data());
@@ -374,7 +374,15 @@ namespace Infra
 
         // Output the log file header.
         static constexpr wchar_t kLogHeaderSeparator[] =
-            L"---------------------------------------------";
+            L"\x23af\x23af\x23af\x23af\x23af\x23af\x23af\x23af\x23af\x23af"
+            L"\x23af\x23af\x23af\x23af\x23af\x23af\x23af\x23af\x23af\x23af"
+            L"\x23af\x23af\x23af\x23af\x23af\x23af\x23af\x23af\x23af\x23af"
+            L"\x23af\x23af\x23af\x23af\x23af\x23af\x23af\x23af\x23af\x23af"
+            L"\x23af\x23af\x23af\x23af\x23af\x23af\x23af\x23af\x23af\x23af"
+            L"\x23af\x23af\x23af\x23af\x23af\x23af\x23af\x23af\x23af\x23af"
+            L"\x23af\x23af\x23af\x23af\x23af\x23af\x23af\x23af\x23af\x23af"
+            L"\x23af\x23af\x23af\x23af\x23af\x23af\x23af\x23af\x23af\x23af";
+
         fwprintf_s(logFileHandle, L"%s\n", kLogHeaderSeparator);
 
         const std::wstring_view productName = ProcessInfo::GetProductName();

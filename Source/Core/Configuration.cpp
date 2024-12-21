@@ -154,7 +154,7 @@ namespace Infra
       inline FileReader(std::wstring_view fileName)
           : ConfigSourceReader(), fileName(fileName), fileHandle(nullptr)
       {
-        _wfopen_s(&fileHandle, this->fileName.c_str(), L"r");
+        _wfopen_s(&fileHandle, this->fileName.c_str(), L"r,ccs=UTF-8");
       }
 
       FileReader(const FileReader& other) = delete;
@@ -1068,7 +1068,7 @@ namespace Infra
       if (readState.readers.Size() >= 2)
       {
         constexpr wchar_t kContinuationArrow = L'\x21b3';
-        int indentNumSpaces = 2;
+        int indentNumSpaces = 1;
         for (int64_t i = static_cast<int64_t>(readState.readers.Size()) - 2; i >= 0; --i)
         {
           const ConfigSourceReader& reader =
@@ -1081,7 +1081,7 @@ namespace Infra
               static_cast<int>(reader.GetConfigSourceName().length()),
               reader.GetConfigSourceName().data(),
               reader.GetLastReadConfigLineNumber()));
-          indentNumSpaces += 2;
+          indentNumSpaces += 1;
         }
       }
     }
