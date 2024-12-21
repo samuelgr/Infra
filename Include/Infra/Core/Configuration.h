@@ -1086,9 +1086,18 @@ namespace Infra
       /// Implements an "include" directive in a configuration file.
       /// @param [in,out] readState Structure that keeps track of the state of the overall read
       /// operation.
-      /// @param [in] configFileToInclude String that identifies the configuration file to be
-      /// included, usually a path.
-      void HandleIncludeDirective(SReadState& readState, std::wstring_view configFileToInclude);
+      /// @param [in] directiveString Directive read from the configuration file. Used exclusively
+      /// for error message generation, if needed.
+      /// @param [in] maybeParamsString Parameter string for the "include" directive, if provided in
+      /// the configuration file.
+      /// @param [in] includeIsRequired Specifies whether or not the inclusion of the other
+      /// configuration file must succeed to avoid an error. If `false` then the "include" directive
+      /// is considered optional and it is not an error if the file does not exist.
+      void HandleIncludeDirective(
+          SReadState& readState,
+          std::wstring_view directiveString,
+          std::optional<std::wstring_view> maybeUnparsedDirectiveParamString,
+          bool includeIsRequired);
 
       /// Internal implementation of parsing and possibly acting on a directive represented in a
       /// configuration file line. Directives begin with the '%' character and modify how

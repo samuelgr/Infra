@@ -1149,9 +1149,27 @@ namespace Infra
     }
 
     void ConfigurationFileReader::HandleIncludeDirective(
-        SReadState& readState, std::wstring_view configFileToInclude)
+        SReadState& readState,
+        std::wstring_view directiveString,
+        std::optional<std::wstring_view> maybeParamsString,
+        bool includeIsRequired)
     {
       const ConfigSourceReader& reader = readState.GetCurrentReader();
+      if (false == maybeParamsString.has_value())
+      {
+        AppendErrorMessage(
+            readState,
+            Strings::Format(
+                L"%.*s(%u): %.*s: Missing operand.",
+                static_cast<int>(reader.GetConfigSourceName().length()),
+                reader.GetConfigSourceName().data(),
+                reader.GetLastReadConfigLineNumber(),
+                static_cast<int>(directiveString.length()),
+                directiveString.data()));
+        return;
+      }
+
+      std::wstring_view configFileToInclude = *maybeParamsString;
       std::unique_ptr<ConfigSourceReader> nextReader;
 
       constexpr std::wstring_view kInMemoryConfigFilePrefix = L"inmemory://";
@@ -1168,15 +1186,18 @@ namespace Infra
         if ((false == parsePointerResult) ||
             (static_cast<size_t>(parsePointerResult) > std::numeric_limits<size_t>::max()))
         {
-          AppendErrorMessage(
-              readState,
-              Strings::Format(
-                  L"%.*s(%u): %.*s: Unable to parse into a pointer.",
-                  static_cast<int>(reader.GetConfigSourceName().length()),
-                  reader.GetConfigSourceName().data(),
-                  reader.GetLastReadConfigLineNumber(),
-                  static_cast<int>(configFileToInclude.length()),
-                  configFileToInclude.data()));
+          if (true == includeIsRequired)
+          {
+            AppendErrorMessage(
+                readState,
+                Strings::Format(
+                    L"%.*s(%u): %.*s: Unable to parse into a pointer.",
+                    static_cast<int>(reader.GetConfigSourceName().length()),
+                    reader.GetConfigSourceName().data(),
+                    reader.GetLastReadConfigLineNumber(),
+                    static_cast<int>(configFileToInclude.length()),
+                    configFileToInclude.data()));
+          }
           return;
         }
         nextReader =
@@ -1187,15 +1208,18 @@ namespace Infra
         nextReader = std::make_unique<FileReader>(configFileToInclude);
         if (true == nextReader->IsError())
         {
-          AppendErrorMessage(
-              readState,
-              Strings::Format(
-                  L"%.*s(%u): %.*s: Unable to open file.",
-                  static_cast<int>(reader.GetConfigSourceName().length()),
-                  reader.GetConfigSourceName().data(),
-                  reader.GetLastReadConfigLineNumber(),
-                  static_cast<int>(configFileToInclude.length()),
-                  configFileToInclude.data()));
+          if (true == includeIsRequired)
+          {
+            AppendErrorMessage(
+                readState,
+                Strings::Format(
+                    L"%.*s(%u): %.*s: Unable to open file.",
+                    static_cast<int>(reader.GetConfigSourceName().length()),
+                    reader.GetConfigSourceName().data(),
+                    reader.GetLastReadConfigLineNumber(),
+                    static_cast<int>(configFileToInclude.length()),
+                    configFileToInclude.data()));
+          }
           return;
         }
       }
@@ -1235,20 +1259,11 @@ namespace Infra
 
       if (Strings::EqualsCaseInsensitive<wchar_t>(directiveString, L"include"))
       {
-        if (false == maybeParamsString.has_value())
-        {
-          AppendErrorMessage(
-              readState,
-              Strings::Format(
-                  L"%.*s(%u): %.*s: Missing operand.",
-                  static_cast<int>(reader.GetConfigSourceName().length()),
-                  reader.GetConfigSourceName().data(),
-                  reader.GetLastReadConfigLineNumber(),
-                  static_cast<int>(directiveString.length()),
-                  directiveString.data()));
-          return;
-        }
-        HandleIncludeDirective(readState, *maybeParamsString);
+        HandleIncludeDirective(readState, directiveString, maybeParamsString, true);
+      }
+      else if (Strings::EqualsCaseInsensitive<wchar_t>(directiveString, L"tryinclude"))
+      {
+        HandleIncludeDirective(readState, directiveString, maybeParamsString, false);
       }
       else
       {

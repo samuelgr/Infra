@@ -1007,4 +1007,19 @@ namespace CoreInfraTest
         (true == testConfigReader.GetErrorMessages().front().contains(L"Cyclical")) ||
         (true == testConfigReader.GetErrorMessages().front().contains(L"cyclical")));
   }
+
+  // Verifies that there is no error that results from a file that does not exist being passed to a
+  // "tryinclude" directive.
+  TEST_CASE(Configuration_ConfigurationFileReader_TryIncludeDirective_FileDoesNotExist)
+  {
+    constexpr std::wstring_view kTestConfigFile =
+        L"%tryinclude inmemory://invalid_pointer\n"
+        L"%tryinclude __invalid_file_name__\n";
+
+    TestConfigurationFileReader testConfigReader;
+    const ConfigurationData configData =
+        testConfigReader.ReadInMemoryConfigurationFile(kTestConfigFile);
+    testConfigReader.LogAllErrorMessages();
+    TEST_ASSERT(false == testConfigReader.HasErrorMessages());
+  }
 } // namespace CoreInfraTest
