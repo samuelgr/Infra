@@ -99,18 +99,6 @@ namespace CoreInfraTest
     TOverrideTypeForValueFunc overrideTypeForValueFunc;
   };
 
-  /// Prints all of the error messages produced by a configuration file read attempt.
-  /// @param [in] configReader Reader object that attempted the read.
-  static void PrintReadErrorMessages(TestConfigurationFileReader& configReader)
-  {
-    if (true == configReader.HasErrorMessages())
-    {
-      ::Infra::Test::Print(L"Got these error messages while reading:");
-      for (const auto& readErrorMessage : configReader.GetErrorMessages())
-        Infra::Test::PrintFormatted(L"    %s", readErrorMessage.c_str());
-    }
-  }
-
   // Verifies that integer values can be created and retrieved correctly. Checks that the resulting
   // object correctly identifies its own type and holds the correct value.
   TEST_CASE(Configuration_Value_CreateAndGetInteger)
@@ -672,7 +660,7 @@ namespace CoreInfraTest
          {L" Section2 ", Section({{L"IntegerMultiSetting", {1, 2, 3, 4, 5}}})}});
     const ConfigurationData actualConfigData =
         testConfigReader.ReadInMemoryConfigurationFile(kTestConfigFile);
-    PrintReadErrorMessages(testConfigReader);
+    testConfigReader.LogAllErrorMessages();
     TEST_ASSERT(actualConfigData == expectedConfigData);
     TEST_ASSERT(false == testConfigReader.HasErrorMessages());
   }
@@ -710,7 +698,7 @@ namespace CoreInfraTest
                 L"string value  with    spaces that should be preserved except at the ends"}})}});
     const ConfigurationData actualConfigData =
         testConfigReader.ReadInMemoryConfigurationFile(kTestConfigFile);
-    PrintReadErrorMessages(testConfigReader);
+    testConfigReader.LogAllErrorMessages();
     TEST_ASSERT(actualConfigData == expectedConfigData);
     TEST_ASSERT(false == testConfigReader.HasErrorMessages());
   }
@@ -735,7 +723,7 @@ namespace CoreInfraTest
     TestConfigurationFileReader testConfigReader;
     const ConfigurationData configData =
         testConfigReader.ReadInMemoryConfigurationFile(kTestConfigFile);
-    PrintReadErrorMessages(testConfigReader);
+    testConfigReader.LogAllErrorMessages();
     TEST_ASSERT(true == testConfigReader.HasErrorMessages());
     TEST_ASSERT(4 == testConfigReader.GetErrorMessages().size());
   }
@@ -766,7 +754,7 @@ namespace CoreInfraTest
     TestConfigurationFileReader testConfigReader;
     const ConfigurationData configData =
         testConfigReader.ReadInMemoryConfigurationFile(kTestConfigFile);
-    PrintReadErrorMessages(testConfigReader);
+    testConfigReader.LogAllErrorMessages();
     TEST_ASSERT(true == testConfigReader.HasErrorMessages());
     TEST_ASSERT(3 == testConfigReader.GetErrorMessages().size());
     TEST_ASSERT(false == configData.Contains(L"Section1Error"));
@@ -820,7 +808,7 @@ namespace CoreInfraTest
          {L"Section2", Section({{L"Value", {L"aa", L"bb", L"cc", L"dd", L"ee"}}})}});
     const ConfigurationData actualConfigData =
         testConfigReader.ReadInMemoryConfigurationFile(kTestConfigFile);
-    PrintReadErrorMessages(testConfigReader);
+    testConfigReader.LogAllErrorMessages();
     TEST_ASSERT(actualConfigData == expectedConfigData);
     TEST_ASSERT(false == testConfigReader.HasErrorMessages());
   }
@@ -857,7 +845,7 @@ namespace CoreInfraTest
                {L"StringVALUE", L"This is a test string 2."}})}});
     const ConfigurationData actualConfigData =
         testConfigReader.ReadInMemoryConfigurationFile(kTestConfigFile);
-    PrintReadErrorMessages(testConfigReader);
+    testConfigReader.LogAllErrorMessages();
     TEST_ASSERT(actualConfigData == expectedConfigData);
 
     // Lookups are case-insensitive, so regardless of case the values should be accessible.
@@ -891,7 +879,7 @@ namespace CoreInfraTest
     TestConfigurationFileReader testConfigReader;
     const ConfigurationData configData =
         testConfigReader.ReadInMemoryConfigurationFile(kTestConfigFile);
-    PrintReadErrorMessages(testConfigReader);
+    testConfigReader.LogAllErrorMessages();
     TEST_ASSERT(true == testConfigReader.HasErrorMessages());
     TEST_ASSERT(2 == testConfigReader.GetErrorMessages().size());
 
@@ -959,7 +947,7 @@ namespace CoreInfraTest
          {L" Section2 ", Section({{L"IntegerMultiSetting", {1, 2, 3, 4, 5}}})}});
     const ConfigurationData actualConfigData =
         testConfigReader.ReadInMemoryConfigurationFile(testConfigFile);
-    PrintReadErrorMessages(testConfigReader);
+    testConfigReader.LogAllErrorMessages();
     TEST_ASSERT(actualConfigData == expectedConfigData);
     TEST_ASSERT(false == testConfigReader.HasErrorMessages());
   }
@@ -990,7 +978,7 @@ namespace CoreInfraTest
          {L"Section3", Section({{L"IntegerSetting", 66}, {L"BooleanSetting", true}})}});
     const ConfigurationData actualConfigData =
         testConfigReader.ReadInMemoryConfigurationFile(testConfigFile);
-    PrintReadErrorMessages(testConfigReader);
+    testConfigReader.LogAllErrorMessages();
     TEST_ASSERT(actualConfigData == expectedConfigData);
     TEST_ASSERT(false == testConfigReader.HasErrorMessages());
   }
@@ -1011,7 +999,7 @@ namespace CoreInfraTest
     TestConfigurationFileReader testConfigReader;
     const ConfigurationData configData =
         testConfigReader.ReadInMemoryConfigurationFile(configFile1);
-    PrintReadErrorMessages(testConfigReader);
+    testConfigReader.LogAllErrorMessages();
     TEST_ASSERT(true == testConfigReader.HasErrorMessages());
 
     // The first error message should be about a cycle.

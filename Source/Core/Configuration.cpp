@@ -29,6 +29,7 @@
 #include <vector>
 
 #include "Core/DebugAssert.h"
+#include "Core/Message.h"
 #include "Core/Strings.h"
 #include "Core/TemporaryBuffer.h"
 
@@ -1052,6 +1053,17 @@ namespace Infra
               reader.GetLastReadConfigLineNumber()));
           indentNumSpaces += 2;
         }
+      }
+    }
+
+    void ConfigurationFileReader::LogAllErrorMessages(
+        Message::ESeverity severity, int indentNumSpaces) const
+    {
+      if ((true == HasErrorMessages()) && (true == Message::WillOutputMessageOfSeverity(severity)))
+      {
+        if (indentNumSpaces < 0) indentNumSpaces = 0;
+        for (const auto& errorMessage : GetErrorMessages())
+          Message::OutputFormatted(severity, L"%*s%s", indentNumSpaces, L"", errorMessage.c_str());
       }
     }
 

@@ -24,6 +24,7 @@
 #include <vector>
 
 #include "DebugAssert.h"
+#include "Message.h"
 #include "Strings.h"
 
 /// Convenience wrapper around initializer list syntax for defining a configuration file section in
@@ -953,6 +954,13 @@ namespace Infra
       {
         return errorMessages.has_value();
       }
+
+      /// Outputs all error messages to the log, if it is enabled for the specified severity.
+      /// @param [in] severity Severity of each generated log message. Defaults to error.
+      /// @param [in] indentNumSpaces Number of spaces to indent each generated log message.
+      /// Defaults to 0.
+      void LogAllErrorMessages(
+          Message::ESeverity severity = Message::ESeverity::Error, int indentNumSpaces = 0) const;
 
       /// Reads and parses a configuration file, storing the settings in the supplied
       /// configuration object. Intended to be invoked externally. Subclasses should not
