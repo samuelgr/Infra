@@ -1001,17 +1001,18 @@ namespace CoreInfraTest
     TemporaryString configFile1;
     TemporaryString configFile2;
     TemporaryString configFile3;
+    TemporaryString configFile4;
 
     configFile1 << L"%include inmemory://" << reinterpret_cast<size_t>(configFile2.Data());
     configFile2 << L"%include inmemory://" << reinterpret_cast<size_t>(configFile3.Data());
-    configFile3 << L"%include inmemory://" << reinterpret_cast<size_t>(configFile1.Data());
+    configFile3 << L"%include inmemory://" << reinterpret_cast<size_t>(configFile4.Data());
+    configFile4 << L"%include inmemory://" << reinterpret_cast<size_t>(configFile2.Data());
 
     TestConfigurationFileReader testConfigReader;
     const ConfigurationData configData =
         testConfigReader.ReadInMemoryConfigurationFile(configFile1);
     PrintReadErrorMessages(testConfigReader);
     TEST_ASSERT(true == testConfigReader.HasErrorMessages());
-    // TEST_ASSERT(4 == testConfigReader.GetErrorMessages().size());
     return;
   }
 } // namespace CoreInfraTest

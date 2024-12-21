@@ -1158,7 +1158,8 @@ namespace Infra
         }
       }
 
-      if (readState.openConfigSources.contains(nextReader->GetConfigSourceName()))
+      const std::wstring_view nextConfigSourceName = nextReader->GetConfigSourceName();
+      if (readState.openConfigSources.contains(nextConfigSourceName))
       {
         AppendErrorMessage(
             readState,
@@ -1172,8 +1173,12 @@ namespace Infra
         return;
       }
 
+      readState.openConfigSources.emplace(nextConfigSourceName);
       readState.readers.EmplaceBack(std::move(nextReader));
+
       ReadConfigurationInternal(readState);
+
+      readState.openConfigSources.erase(nextConfigSourceName);
       readState.readers.PopBack();
     }
 
