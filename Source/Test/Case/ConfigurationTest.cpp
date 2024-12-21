@@ -917,4 +917,81 @@ namespace CoreInfraTest
     // The configuration data object should not contain any of the values in the duplicated section.
     TEST_ASSERT(false == configData.Contains(L"secTION1", L"Booleanvalue"));
   }
+
+  // Verifies that include directives operate correctly and can import one configuration file into
+  // another. In this case, only a single include directive is used to import one file into another.
+  TEST_CASE(Configuration_ConfigurationFileReader_IncludeDirective_Simple)
+  {
+    constexpr std::wstring_view kIncludedConfigFile =
+        L"   GlobalBooleanSetting    =          yes    \n"
+        L"AnotherGlobalBooleanSetting=no  \n"
+        L"\n"
+        L"; This is a comment\n"
+        L"   ### This is another comment\n"
+        L"   [Section1]   \n"
+        L"IntegerSetting = 66\n"
+        L"StringSetting =    string value  with    spaces that should be preserved except at the ends     \n"
+        L"  [ Section2 ]  \n"
+        L"IntegerMultiSetting = 1\n"
+        L"IntegerMultiSetting = 2\n"
+        L"IntegerMultiSetting = 3\n"
+        L"IntegerMultiSetting = 4\n"
+        L"IntegerMultiSetting = 5\n"
+        L"     \n"
+        L"     \n"
+        L"\n";
+    TemporaryString testConfigFile = Infra::Strings::Format(
+        L"\n"
+        L"\n"
+        L"  %%    include      inmemory://0x%zx    \n"
+        L"\n",
+        reinterpret_cast<size_t>(kIncludedConfigFile.data()));
+    TestConfigurationFileReader testConfigReader;
+
+    const ConfigurationData expectedConfigData(
+        {{std::wstring(kSectionNameGlobal),
+          Section({{L"GlobalBooleanSetting", true}, {L"AnotherGlobalBooleanSetting", false}})},
+         {L"Section1",
+          Section(
+              {{L"IntegerSetting", 66},
+               {L"StringSetting",
+                L"string value  with    spaces that should be preserved except at the ends"}})},
+         {L" Section2 ", Section({{L"IntegerMultiSetting", {1, 2, 3, 4, 5}}})}});
+    const ConfigurationData actualConfigData =
+        testConfigReader.ReadInMemoryConfigurationFile(testConfigFile);
+    PrintReadErrorMessages(testConfigReader);
+    TEST_ASSERT(actualConfigData == expectedConfigData);
+    TEST_ASSERT(false == testConfigReader.HasErrorMessages());
+  }
+
+  // Verifies that multiple include directives can be used in the same configuration file. In this
+  // case, the contents of three sections should all be the same and as determined by a single
+  // included configuration file.
+  TEST_CASE(Configuration_ConfigurationFileReader_IncludeDirective_ReuseSectionContents)
+  {
+    constexpr std::wstring_view kIncludedConfigFile =
+        L"IntegerSetting = 66\n"
+        L"BooleanSetting = true\n";
+    TemporaryString testConfigFile = Infra::Strings::Format(
+        L"[Section1]\n"
+        L"%%include inmemory://0x%zx\n"
+        L"[Section2]\n"
+        L"%%include inmemory://0x%zx\n"
+        L"[Section3]\n"
+        L"%%include inmemory://0x%zx\n",
+        reinterpret_cast<size_t>(kIncludedConfigFile.data()),
+        reinterpret_cast<size_t>(kIncludedConfigFile.data()),
+        reinterpret_cast<size_t>(kIncludedConfigFile.data()));
+    TestConfigurationFileReader testConfigReader;
+
+    const ConfigurationData expectedConfigData(
+        {{L"Section1", Section({{L"IntegerSetting", 66}, {L"BooleanSetting", true}})},
+         {L"Section2", Section({{L"IntegerSetting", 66}, {L"BooleanSetting", true}})},
+         {L"Section3", Section({{L"IntegerSetting", 66}, {L"BooleanSetting", true}})}});
+    const ConfigurationData actualConfigData =
+        testConfigReader.ReadInMemoryConfigurationFile(testConfigFile);
+    PrintReadErrorMessages(testConfigReader);
+    TEST_ASSERT(actualConfigData == expectedConfigData);
+    TEST_ASSERT(false == testConfigReader.HasErrorMessages());
+  }
 } // namespace CoreInfraTest

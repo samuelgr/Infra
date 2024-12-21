@@ -20,10 +20,12 @@
 #include <limits>
 #include <memory>
 #include <optional>
+#include <set>
 #include <sstream>
 #include <string>
 #include <string_view>
 #include <type_traits>
+#include <unordered_map>
 #include <vector>
 
 #include "Core/DebugAssert.h"
@@ -34,12 +36,16 @@ namespace Infra
 {
   namespace Configuration
   {
-    /// Enumerates all possible classifications of configuration file lines.
-    /// Used during parsing to classify each line encountered.
+    /// Enumerates all possible classifications of configuration file lines. Used during parsing to
+    /// classify each line encountered.
     enum class ELineClassification
     {
       /// Line could not be parsed.
       Error,
+
+      /// Line contains an directive that provides an instruction on how to process the
+      /// configuration file.
+      Directive,
 
       /// Line should be ignored, either because it is just whitespace or because it is a
       /// comment.
@@ -54,13 +60,13 @@ namespace Infra
 
     /// Base class containing common functionality for reading from a configuration file. Abstracts
     /// away the details of reading from various sources, including files and memory buffers.
-    class ConfigSourceReaderBase
+    class ConfigSourceReader
     {
     public:
 
-      constexpr ConfigSourceReaderBase(void) : lastReadConfigLineNumber(0) {}
+      constexpr ConfigSourceReader(void) : lastReadConfigLineNumber(0) {}
 
-      virtual ~ConfigSourceReaderBase(void) = default;
+      virtual ~ConfigSourceReader(void) = default;
 
       /// Retrieves a string identifying the name of the configuration source.
       /// @return String identifier of the config source name.
@@ -110,14 +116,14 @@ namespace Infra
 
     /// Reader that uses a file as input. Attempts to open the specified file on construction and
     /// close it on destruction.
-    class FileReader : public ConfigSourceReaderBase
+    class FileReader : public ConfigSourceReader
     {
     public:
 
-      inline FileReader(const wchar_t* fileName)
-          : ConfigSourceReaderBase(), fileName(fileName), fileHandle(nullptr)
+      inline FileReader(std::wstring_view fileName)
+          : ConfigSourceReader(), fileName(fileName), fileHandle(nullptr)
       {
-        _wfopen_s(&fileHandle, fileName, L"r");
+        _wfopen_s(&fileHandle, this->fileName.c_str(), L"r");
       }
 
       FileReader(const FileReader& other) = delete;
@@ -127,7 +133,7 @@ namespace Infra
         if (nullptr != fileHandle) fclose(fileHandle);
       }
 
-      // ConfigSourceReaderBase
+      // ConfigSourceReader
       std::wstring_view GetConfigSourceName(void) const override
       {
         return fileName;
@@ -165,12 +171,12 @@ namespace Infra
 
     /// Reader that uses an in-memory buffer as input. Primarily used for tests, and does not claim
     /// any ownership over the buffer itself.
-    class MemoryBufferReader : public ConfigSourceReaderBase
+    class MemoryBufferReader : public ConfigSourceReader
     {
     public:
 
       inline MemoryBufferReader(std::wstring_view configBuffer)
-          : ConfigSourceReaderBase(),
+          : ConfigSourceReader(),
             configSourceName(Strings::Format(
                 L"[0x%0.*zx]",
                 static_cast<int>(2 * sizeof(size_t)),
@@ -178,7 +184,7 @@ namespace Infra
             remainingBuffer(configBuffer)
       {}
 
-      // ConfigSourceReaderBase
+      // ConfigSourceReader
       std::wstring_view GetConfigSourceName(void) const override
       {
         return configSourceName;
@@ -220,37 +226,42 @@ namespace Infra
     };
 
     /// Structure for holding the state of an overall configuration file read operation.
-    struct ConfigurationFileReader::SReadState
+    struct SReadState
     {
       /// Stack that holds all reader objects, most recent first. When an "include" directive is
       /// encountered in a configuration file, a new reader is pushed onto this stack.
-      TemporaryVector<std::unique_ptr<ConfigSourceReaderBase>> readers;
+      TemporaryVector<std::unique_ptr<ConfigSourceReader>> readers;
 
       /// Configuration data to be filled during the read operation.
       ConfigurationData configToFill;
 
       /// Set of all sections whose names have already been seen. Used to detect duplicate sections.
-      TSeenSections seenSections;
+      std::set<std::wstring, Strings::CaseInsensitiveLessThanComparator<wchar_t>> seenSections;
 
       /// Name of the current section into which configuration settings should be inserted.
       std::wstring_view currentSection;
 
-      /// If `true` then all of the values in the current section should be skipped.
-      bool skipValueLines;
+      struct
+      {
+        /// If `true` then all of the values in the current section should be skipped.
+        bool skipValueLines : 1;
 
-      inline SReadState(std::unique_ptr<ConfigSourceReaderBase>&& reader)
+        /// If `true` then in-memory configuration files are allowed to be read.
+        bool allowReadFromInMemoryConfigFiles : 1;
+      };
+
+      inline SReadState(void)
           : readers(),
             configToFill(),
             seenSections({std::wstring(kSectionNameGlobal)}),
             currentSection(kSectionNameGlobal),
-            skipValueLines(false)
-      {
-        readers.EmplaceBack(std::move(reader));
-      }
+            skipValueLines(false),
+            allowReadFromInMemoryConfigFiles(false)
+      {}
 
       /// Retrieves a mutable reference to the config source reader at the top of the stack.
       /// @return Config source reader at the top of the stack.
-      inline ConfigSourceReaderBase& GetCurrentReader(void)
+      inline ConfigSourceReader& GetCurrentReader(void)
       {
         DebugAssert(false == readers.Empty(), "No current reader defined.");
         return *readers.Back().get();
@@ -258,12 +269,14 @@ namespace Infra
 
       /// Retrieves a read-only reference to the config source reader at the top of the stack.
       /// @return Config source reader at the top of the stack.
-      inline const ConfigSourceReaderBase& GetCurrentReader(void) const
+      inline const ConfigSourceReader& GetCurrentReader(void) const
       {
         DebugAssert(false == readers.Empty(), "No current reader defined.");
         return *readers.Back().get();
       }
     };
+
+    constexpr int x = sizeof(SReadState);
 
     /// Determines and returns the canonical single-valued type for each possible multi-valued type
     /// enumerator.
@@ -467,10 +480,15 @@ namespace Infra
           L'#' == configLineTrimmed.front())
         return ELineClassification::Ignore;
 
-      // Non-comments must, by definition, have at least three characters in them, excluding
-      // all whitespace. For section headers, this must mean '[' + section name + ']'. For
-      // values, this must mean name + '=' + value.
+      // Non-comments and non-directives must, by definition, have at least three characters in
+      // them, excluding all whitespace. For section headers, this must mean '[' + section name +
+      // ']'. For values, this must mean name + '=' + value. For directives, this means '%' plus
+      // at least two other characters.
       if (configLineTrimmed.length() < 3) return ELineClassification::Error;
+
+      // Directives begin with a percent sign. The validity of a directive is a semantic decision
+      // made later on a per-directive basis.
+      if (L'%' == configLineTrimmed.front()) return ELineClassification::Directive;
 
       if (L'[' == configLineTrimmed[0])
       {
@@ -612,38 +630,99 @@ namespace Infra
       return true;
     }
 
+    /// Attempts to parse an assignment string into a left-hand-side string (the target of the
+    /// assignment) and a right-hand-side string (the value being assigned).
+    /// @param [in] strUnparsed Unparsed string that could be containing the assignment statement.
+    /// @param [out] lhs Parsed left-hand-side of the assignment statement.
+    /// @param [out] rhs Parsed right-hand-side of the assignment statement.
+    /// @param [in] separator Character that separates the left side of the assignment from the
+    /// right side. Typically this is an equals sign, which is the default.
+    /// @return `true` if the supplied statement was successfully parsed as an assignment statement,
+    /// `false` otherwise.
+    static bool ParseAssignmentString(
+        std::wstring_view strUnparsed,
+        std::wstring_view& lhs,
+        std::wstring_view& rhs,
+        wchar_t separator = L'=')
+    {
+      const size_t separatorPosition = strUnparsed.find_first_of(L'=');
+      if (std::wstring_view::npos == separatorPosition) return false;
+
+      lhs = Strings::TrimWhitespace(strUnparsed.substr(0, separatorPosition));
+      rhs = Strings::TrimWhitespace(strUnparsed.substr(1 + separatorPosition));
+      return true;
+    }
+
+    /// Parses a directive and its parameters for the specified configuration file line, which must
+    /// first have been classified as containing a directive.
+    /// @param [in] configLineTrimmed Line read from the configuration file with whitespace already
+    /// trimmed.
+    /// @param [out] directiveString Filled with the directive itself.
+    /// @param [out] maybeParamsString Filled with unparsed parameters to the directive, if they are
+    /// present.
+    static void ParseDirective(
+        std::wstring_view configLineTrimmed,
+        std::wstring_view& directiveString,
+        std::optional<std::wstring_view>& maybeParamsString)
+    {
+      DebugAssert(
+          0 == configLineTrimmed.find_first_of(L'%'),
+          "Attempting to parse a directive from a line that does not contain one.");
+
+      // Skip over the '%' sign and any whitespace after it but before the directive name.
+      configLineTrimmed.remove_prefix(1);
+      configLineTrimmed = Strings::TrimLeadingWhitespace(configLineTrimmed);
+
+      // Directives are separated from their parameters by whitespace. An absence of whitespace
+      // indicates an absence of parameters.
+      const size_t firstSpacePosition = configLineTrimmed.find_first_of(L' ');
+      if (std::wstring_view::npos == firstSpacePosition)
+      {
+        directiveString = configLineTrimmed;
+        maybeParamsString = std::nullopt;
+      }
+      else
+      {
+        directiveString = Strings::TrimWhitespace(configLineTrimmed.substr(0, firstSpacePosition));
+        maybeParamsString =
+            Strings::TrimWhitespace(configLineTrimmed.substr(1 + firstSpacePosition));
+      }
+    }
+
     /// Parses a name and a value for the specified configuration file line, which must first
     /// have been classified as containing a name and value pair.
-    /// @param [in] configLine Line read from the configuration file.
+    /// @param [in] configLineTrimmed Line read from the configuration file with whitespace already
+    /// trimmed.
     /// @param [out] nameString Filled with the name of the configuration setting.
     /// @param [out] valueString Filled with the value specified for the configuration setting.
     static void ParseNameAndValue(
-        std::wstring_view configLine, std::wstring_view& nameString, std::wstring_view& valueString)
+        std::wstring_view configLineTrimmed,
+        std::wstring_view& nameString,
+        std::wstring_view& valueString)
     {
+      const bool parseResult = ParseAssignmentString(configLineTrimmed, nameString, valueString);
       DebugAssert(
-          std::wstring_view::npos != configLine.find_first_of(L'='),
+          true == parseResult,
           "Attempting to parse a name/value pair from a line that does not contain one.");
-
-      const size_t equalSignPosition = configLine.find_first_of(L'=');
-      nameString = Strings::TrimWhitespace(configLine.substr(0, equalSignPosition));
-      valueString = Strings::TrimWhitespace(configLine.substr(1 + equalSignPosition));
     }
 
     /// Parses a section name from the specified configuration file line, which must first have
     /// been classified as containing a section name.
-    /// @param [in] configLine Line read from the configuration file.
+    /// @param [in] configLineTrimmed Line read from the configuration file with whitespace already
+    /// trimmed.
     /// @param String containing the name of the configuration section.
-    static std::wstring_view ParseSection(std::wstring_view configLine)
+    static std::wstring_view ParseSection(std::wstring_view configLineTrimmed)
     {
       DebugAssert(
-          ((std::wstring_view::npos != configLine.find_first_of(L'[')) &&
-           (std::wstring_view::npos != configLine.find_first_of(L']')) &&
-           (configLine.find_first_of(L']') > configLine.find_first_of(L'['))),
+          ((std::wstring_view::npos != configLineTrimmed.find_first_of(L'[')) &&
+           (std::wstring_view::npos != configLineTrimmed.find_first_of(L']')) &&
+           (configLineTrimmed.find_first_of(L']') > configLineTrimmed.find_first_of(L'['))),
           "Attempting to parse a section name from a line that does not contain one.");
 
-      std::wstring_view parsedSection = configLine;
-      parsedSection.remove_prefix(1 + configLine.find_first_of(L'['));
-      parsedSection.remove_suffix(configLine.length() - configLine.find_first_of(L']'));
+      std::wstring_view parsedSection = configLineTrimmed;
+      parsedSection.remove_prefix(1 + configLineTrimmed.find_first_of(L'['));
+      parsedSection.remove_suffix(
+          configLineTrimmed.length() - configLineTrimmed.find_first_of(L']'));
       return parsedSection;
     }
 
@@ -943,61 +1022,198 @@ namespace Infra
           std::move(extractedSection.key()), std::move(extractedSection.mapped()));
     }
 
-    void ConfigurationFileReader::AppendErrorMessage(std::wstring_view errorMessage)
+    void ConfigurationFileReader::AppendErrorMessage(
+        const SReadState& readState, std::wstring_view errorMessage)
     {
       if (false == errorMessages.has_value()) errorMessages.emplace();
       errorMessages->emplace_back(errorMessage);
+
+      // If more than one reader is present in the stack, an "include backtrace" will additionally
+      // be appended to the list of error messages, one per element in the stack.
+      if (readState.readers.Size() >= 2)
+      {
+        constexpr wchar_t kContinuationArrow = L'\x21b3';
+        int indentNumSpaces = 2;
+        for (int64_t i = static_cast<int64_t>(readState.readers.Size()) - 2; i >= 0; --i)
+        {
+          const ConfigSourceReader& reader =
+              *(readState.readers[static_cast<unsigned int>(i)].get());
+          errorMessages->emplace_back(Strings::Format(
+              L"%*s%c Included from %.*s(%u)",
+              indentNumSpaces,
+              L"",
+              kContinuationArrow,
+              static_cast<int>(reader.GetConfigSourceName().length()),
+              reader.GetConfigSourceName().data(),
+              reader.GetLastReadConfigLineNumber()));
+          indentNumSpaces += 2;
+        }
+      }
     }
 
     ConfigurationData ConfigurationFileReader::ReadConfigurationFile(
         std::wstring_view configFileName, bool mustExist)
     {
-      errorMessages.reset();
+      SReadState readState;
 
-      std::unique_ptr<ConfigSourceReaderBase> fileReader =
+      errorMessages.reset();
+      std::unique_ptr<ConfigSourceReader> fileReader =
           std::make_unique<FileReader>(configFileName.data());
       if (true == fileReader->IsError())
       {
         if (true == mustExist)
-          AppendErrorMessage(Strings::Format(
-              L"%.*s: Unable to open file.",
-              static_cast<int>(configFileName.length()),
-              configFileName.data()));
+        {
+          AppendErrorMessage(
+              readState,
+              Strings::Format(
+                  L"%.*s: Unable to open file.",
+                  static_cast<int>(configFileName.length()),
+                  configFileName.data()));
+        }
         return ConfigurationData();
       }
 
-      SReadState readState(std::move(fileReader));
+      readState.readers.EmplaceBack(std::move(fileReader));
+
+      BeginRead();
       ReadConfigurationInternal(readState);
+      EndRead();
+
       return std::move(readState.configToFill);
     }
 
     ConfigurationData ConfigurationFileReader::ReadInMemoryConfigurationFile(
         std::wstring_view configBuffer)
     {
-      errorMessages.reset();
-      std::unique_ptr<ConfigSourceReaderBase> memoryBufferReader =
-          std::make_unique<MemoryBufferReader>(configBuffer);
+      SReadState readState;
+      readState.allowReadFromInMemoryConfigFiles = true;
 
-      SReadState readState(std::move(memoryBufferReader));
+      errorMessages.reset();
+      std::unique_ptr<ConfigSourceReader> memoryBufferReader =
+          std::make_unique<MemoryBufferReader>(configBuffer);
+      readState.readers.EmplaceBack(std::move(memoryBufferReader));
+
+      BeginRead();
       ReadConfigurationInternal(readState);
+      EndRead();
+
       return std::move(readState.configToFill);
+    }
+
+    void ConfigurationFileReader::HandleIncludeDirective(
+        SReadState& readState, std::wstring_view configFileToInclude)
+    {
+      const ConfigSourceReader& reader = readState.GetCurrentReader();
+      std::unique_ptr<ConfigSourceReader> nextReader;
+
+      constexpr std::wstring_view kInMemoryConfigFilePrefix = L"inmemory://";
+      if ((true == readState.allowReadFromInMemoryConfigFiles) &&
+          (true ==
+           Strings::StartsWithCaseInsensitive<wchar_t>(
+               configFileToInclude, kInMemoryConfigFilePrefix)))
+      {
+        configFileToInclude.remove_prefix(kInMemoryConfigFilePrefix.length());
+
+        TIntegerValue pointerParsed = 0;
+        const bool parsePointerResult =
+            ParseTypedValue<TIntegerValue>(configFileToInclude, pointerParsed);
+        if ((false == parsePointerResult) ||
+            (static_cast<size_t>(parsePointerResult) > std::numeric_limits<size_t>::max()))
+        {
+          AppendErrorMessage(
+              readState,
+              Strings::Format(
+                  L"%.*s(%u): %.*s: Unable to parse into a pointer.",
+                  static_cast<int>(reader.GetConfigSourceName().length()),
+                  reader.GetConfigSourceName().data(),
+                  reader.GetLastReadConfigLineNumber(),
+                  static_cast<int>(configFileToInclude.length()),
+                  configFileToInclude.data()));
+          return;
+        }
+        nextReader =
+            std::make_unique<MemoryBufferReader>(reinterpret_cast<wchar_t*>(pointerParsed));
+      }
+      else
+      {
+        nextReader = std::make_unique<FileReader>(configFileToInclude);
+        if (true == nextReader->IsError())
+        {
+          AppendErrorMessage(
+              readState,
+              Strings::Format(
+                  L"%.*s(%u): %.*s: Unable to open file.",
+                  static_cast<int>(reader.GetConfigSourceName().length()),
+                  reader.GetConfigSourceName().data(),
+                  reader.GetLastReadConfigLineNumber(),
+                  static_cast<int>(configFileToInclude.length()),
+                  configFileToInclude.data()));
+          return;
+        }
+      }
+
+      readState.readers.EmplaceBack(std::move(nextReader));
+      ReadConfigurationInternal(readState);
+      readState.readers.PopBack();
+    }
+
+    void ConfigurationFileReader::ParseAndMaybeHandleDirective(
+        SReadState& readState, std::wstring_view configLineTrimmed)
+    {
+      const ConfigSourceReader& reader = readState.GetCurrentReader();
+
+      std::wstring_view directiveString;
+      std::optional<std::wstring_view> maybeParamsString;
+      ParseDirective(configLineTrimmed, directiveString, maybeParamsString);
+
+      if (Strings::EqualsCaseInsensitive<wchar_t>(directiveString, L"include"))
+      {
+        if (false == maybeParamsString.has_value())
+        {
+          AppendErrorMessage(
+              readState,
+              Strings::Format(
+                  L"%.*s(%u): %.*s: Missing operand.",
+                  static_cast<int>(reader.GetConfigSourceName().length()),
+                  reader.GetConfigSourceName().data(),
+                  reader.GetLastReadConfigLineNumber(),
+                  static_cast<int>(directiveString.length()),
+                  directiveString.data()));
+          return;
+        }
+        HandleIncludeDirective(readState, *maybeParamsString);
+      }
+      else
+      {
+        AppendErrorMessage(
+            readState,
+            Strings::Format(
+                L"%.*s(%u): %.*s: Unrecognized directive.",
+                static_cast<int>(reader.GetConfigSourceName().length()),
+                reader.GetConfigSourceName().data(),
+                reader.GetLastReadConfigLineNumber(),
+                static_cast<int>(directiveString.length()),
+                directiveString.data()));
+      }
     }
 
     void ConfigurationFileReader::ParseAndMaybeInsertSection(
         SReadState& readState, std::wstring_view configLineTrimmed)
     {
-      const ConfigSourceReaderBase& reader = readState.GetCurrentReader();
+      const ConfigSourceReader& reader = readState.GetCurrentReader();
 
       std::wstring_view section = ParseSection(configLineTrimmed);
       if (0 != readState.seenSections.count(section))
       {
-        AppendErrorMessage(Strings::Format(
-            L"%.*s(%u): %.*s: Duplicated section name.",
-            static_cast<int>(reader.GetConfigSourceName().length()),
-            reader.GetConfigSourceName().data(),
-            reader.GetLastReadConfigLineNumber(),
-            static_cast<int>(section.length()),
-            section.data()));
+        AppendErrorMessage(
+            readState,
+            Strings::Format(
+                L"%.*s(%u): %.*s: Duplicated section name.",
+                static_cast<int>(reader.GetConfigSourceName().length()),
+                reader.GetConfigSourceName().data(),
+                reader.GetLastReadConfigLineNumber(),
+                static_cast<int>(section.length()),
+                section.data()));
         readState.skipValueLines = true;
         return;
       }
@@ -1007,20 +1223,24 @@ namespace Infra
       {
         case EAction::Error:
           if (true == sectionAction.HasErrorMessage())
-            AppendErrorMessage(Strings::Format(
-                L"%.*s(%u): %s",
-                static_cast<int>(reader.GetConfigSourceName().length()),
-                reader.GetConfigSourceName().data(),
-                reader.GetLastReadConfigLineNumber(),
-                sectionAction.GetErrorMessage().c_str()));
+            AppendErrorMessage(
+                readState,
+                Strings::Format(
+                    L"%.*s(%u): %s",
+                    static_cast<int>(reader.GetConfigSourceName().length()),
+                    reader.GetConfigSourceName().data(),
+                    reader.GetLastReadConfigLineNumber(),
+                    sectionAction.GetErrorMessage().c_str()));
           else
-            AppendErrorMessage(Strings::Format(
-                L"%.*s(%u): %.*s: Unrecognized section name.",
-                static_cast<int>(reader.GetConfigSourceName().length()),
-                reader.GetConfigSourceName().data(),
-                reader.GetLastReadConfigLineNumber(),
-                static_cast<int>(section.length()),
-                section.data()));
+            AppendErrorMessage(
+                readState,
+                Strings::Format(
+                    L"%.*s(%u): %.*s: Unrecognized section name.",
+                    static_cast<int>(reader.GetConfigSourceName().length()),
+                    reader.GetConfigSourceName().data(),
+                    reader.GetLastReadConfigLineNumber(),
+                    static_cast<int>(section.length()),
+                    section.data()));
           readState.skipValueLines = true;
           break;
 
@@ -1034,91 +1254,99 @@ namespace Infra
           break;
 
         default:
-          AppendErrorMessage(Strings::Format(
-              L"%.*s(%u): Internal error while processing section name.",
-              static_cast<int>(reader.GetConfigSourceName().length()),
-              reader.GetConfigSourceName().data(),
-              reader.GetLastReadConfigLineNumber()));
+          AppendErrorMessage(
+              readState,
+              Strings::Format(
+                  L"%.*s(%u): Internal error while processing section name.",
+                  static_cast<int>(reader.GetConfigSourceName().length()),
+                  reader.GetConfigSourceName().data(),
+                  reader.GetLastReadConfigLineNumber()));
           readState.skipValueLines = true;
           break;
       }
     }
 
     template <typename ValueType> void ConfigurationFileReader::ParseAndMaybeInsertValue(
-        const ConfigSourceReaderBase& reader,
-        ConfigurationData& configToFill,
-        std::wstring_view section,
+        SReadState& readState,
         std::wstring_view name,
         EValueType valueType,
         std::wstring_view valueUnparsed)
     {
+      const ConfigSourceReader& reader = readState.GetCurrentReader();
+
       ValueType valueParsed{};
       if (false == ParseTypedValue(valueUnparsed, valueParsed))
       {
         std::wstring_view typeString = TypeToString(ValueTypeToSingleValueEnumerator<ValueType>());
-        AppendErrorMessage(Strings::Format(
-            L"%.*s(%u): %.*s: Failed to parse %.*s value.",
-            static_cast<int>(reader.GetConfigSourceName().length()),
-            reader.GetConfigSourceName().data(),
-            reader.GetLastReadConfigLineNumber(),
-            static_cast<int>(valueUnparsed.length()),
-            valueUnparsed.data(),
-            static_cast<int>(typeString.length()),
-            typeString.data()));
-        return;
-      }
-
-      const Action valueAction = ActionForValue(section, name, valueParsed);
-      switch (valueAction.GetAction())
-      {
-        case EAction::Error:
-          if (true == valueAction.HasErrorMessage())
-            AppendErrorMessage(Strings::Format(
-                L"%.*s(%u): %s",
-                static_cast<int>(reader.GetConfigSourceName().length()),
-                reader.GetConfigSourceName().data(),
-                reader.GetLastReadConfigLineNumber(),
-                valueAction.GetErrorMessage().c_str()));
-          else
-            AppendErrorMessage(Strings::Format(
-                L"%.*s(%u): %.*s: Invalid value for configuration setting %.*s.",
+        AppendErrorMessage(
+            readState,
+            Strings::Format(
+                L"%.*s(%u): %.*s: Failed to parse %.*s value.",
                 static_cast<int>(reader.GetConfigSourceName().length()),
                 reader.GetConfigSourceName().data(),
                 reader.GetLastReadConfigLineNumber(),
                 static_cast<int>(valueUnparsed.length()),
                 valueUnparsed.data(),
-                static_cast<int>(name.length()),
-                name.data()));
+                static_cast<int>(typeString.length()),
+                typeString.data()));
+        return;
+      }
+
+      const Action valueAction = ActionForValue(readState.currentSection, name, valueParsed);
+      switch (valueAction.GetAction())
+      {
+        case EAction::Error:
+          if (true == valueAction.HasErrorMessage())
+            AppendErrorMessage(
+                readState,
+                Strings::Format(
+                    L"%.*s(%u): %s",
+                    static_cast<int>(reader.GetConfigSourceName().length()),
+                    reader.GetConfigSourceName().data(),
+                    reader.GetLastReadConfigLineNumber(),
+                    valueAction.GetErrorMessage().c_str()));
+          else
+            AppendErrorMessage(
+                readState,
+                Strings::Format(
+                    L"%.*s(%u): %.*s: Invalid value for configuration setting %.*s.",
+                    static_cast<int>(reader.GetConfigSourceName().length()),
+                    reader.GetConfigSourceName().data(),
+                    reader.GetLastReadConfigLineNumber(),
+                    static_cast<int>(valueUnparsed.length()),
+                    valueUnparsed.data(),
+                    static_cast<int>(name.length()),
+                    name.data()));
           break;
 
         case EAction::Process:
           if (false ==
-              configToFill.Insert(
-                  section,
+              readState.configToFill.Insert(
+                  readState.currentSection,
                   name,
                   Value(
                       std::move(valueParsed),
                       valueType,
                       reader.GetConfigSourceName(),
                       reader.GetLastReadConfigLineNumber())))
-            AppendErrorMessage(Strings::Format(
-                L"%.*s(%u): %.*s: Duplicated value for configuration setting %.*s.",
-                static_cast<int>(reader.GetConfigSourceName().length()),
-                reader.GetConfigSourceName().data(),
-                reader.GetLastReadConfigLineNumber(),
-                static_cast<int>(valueUnparsed.length()),
-                valueUnparsed.data(),
-                static_cast<int>(name.length()),
-                name.data()));
+            AppendErrorMessage(
+                readState,
+                Strings::Format(
+                    L"%.*s(%u): %.*s: Duplicated value for configuration setting %.*s.",
+                    static_cast<int>(reader.GetConfigSourceName().length()),
+                    reader.GetConfigSourceName().data(),
+                    reader.GetLastReadConfigLineNumber(),
+                    static_cast<int>(valueUnparsed.length()),
+                    valueUnparsed.data(),
+                    static_cast<int>(name.length()),
+                    name.data()));
           break;
       }
     }
 
     void ConfigurationFileReader::ReadConfigurationInternal(SReadState& readState)
     {
-      BeginRead();
-
-      ConfigSourceReaderBase& reader = readState.GetCurrentReader();
+      ConfigSourceReader& reader = readState.GetCurrentReader();
 
       TemporaryString configLine;
       bool configLineReadResult = reader.ReadLine(configLine);
@@ -1130,11 +1358,17 @@ namespace Infra
         switch (ClassifyConfigurationFileLine(configLineTrimmed))
         {
           case ELineClassification::Error:
-            AppendErrorMessage(Strings::Format(
-                L"%.*s(%u): Unable to parse line.",
-                static_cast<int>(reader.GetConfigSourceName().length()),
-                reader.GetConfigSourceName().data(),
-                reader.GetLastReadConfigLineNumber()));
+            AppendErrorMessage(
+                readState,
+                Strings::Format(
+                    L"%.*s(%u): Unable to parse line.",
+                    static_cast<int>(reader.GetConfigSourceName().length()),
+                    reader.GetConfigSourceName().data(),
+                    reader.GetLastReadConfigLineNumber()));
+            break;
+
+          case ELineClassification::Directive:
+            ParseAndMaybeHandleDirective(readState, configLineTrimmed);
             break;
 
           case ELineClassification::Ignore:
@@ -1161,78 +1395,68 @@ namespace Infra
               if ((false == TypeAllowsMultipleValues(valueType)) &&
                   (readState.configToFill.Contains(readState.currentSection, name)))
               {
-                AppendErrorMessage(Strings::Format(
-                    L"%.*s(%u): %.*s: Only a single value is allowed for this setting.",
-                    static_cast<int>(reader.GetConfigSourceName().length()),
-                    reader.GetConfigSourceName().data(),
-                    reader.GetLastReadConfigLineNumber(),
-                    static_cast<int>(name.length()),
-                    name.data()));
+                AppendErrorMessage(
+                    readState,
+                    Strings::Format(
+                        L"%.*s(%u): %.*s: Only a single value is allowed for this setting.",
+                        static_cast<int>(reader.GetConfigSourceName().length()),
+                        reader.GetConfigSourceName().data(),
+                        reader.GetLastReadConfigLineNumber(),
+                        static_cast<int>(name.length()),
+                        name.data()));
                 break;
               }
 
               switch (valueType)
               {
                 case EValueType::Error:
-                  AppendErrorMessage(Strings::Format(
-                      L"%.*s(%u): %.*s: Unrecognized configuration setting.",
-                      static_cast<int>(reader.GetConfigSourceName().length()),
-                      reader.GetConfigSourceName().data(),
-                      reader.GetLastReadConfigLineNumber(),
-                      static_cast<int>(name.length()),
-                      name.data()));
+                  AppendErrorMessage(
+                      readState,
+                      Strings::Format(
+                          L"%.*s(%u): %.*s: Unrecognized configuration setting.",
+                          static_cast<int>(reader.GetConfigSourceName().length()),
+                          reader.GetConfigSourceName().data(),
+                          reader.GetLastReadConfigLineNumber(),
+                          static_cast<int>(name.length()),
+                          name.data()));
                   break;
 
                 case EValueType::Integer:
                 case EValueType::IntegerMultiValue:
-                  ParseAndMaybeInsertValue<TIntegerValue>(
-                      reader,
-                      readState.configToFill,
-                      readState.currentSection,
-                      name,
-                      valueType,
-                      value);
+                  ParseAndMaybeInsertValue<TIntegerValue>(readState, name, valueType, value);
                   break;
 
                 case EValueType::Boolean:
                 case EValueType::BooleanMultiValue:
-                  ParseAndMaybeInsertValue<TBooleanValue>(
-                      reader,
-                      readState.configToFill,
-                      readState.currentSection,
-                      name,
-                      valueType,
-                      value);
+                  ParseAndMaybeInsertValue<TBooleanValue>(readState, name, valueType, value);
                   break;
 
                 case EValueType::String:
                 case EValueType::StringMultiValue:
-                  ParseAndMaybeInsertValue<TStringValue>(
-                      reader,
-                      readState.configToFill,
-                      readState.currentSection,
-                      name,
-                      valueType,
-                      value);
+                  ParseAndMaybeInsertValue<TStringValue>(readState, name, valueType, value);
                   break;
 
                 default:
-                  AppendErrorMessage(Strings::Format(
-                      L"%.*s(%u): Internal error while processing configuration setting.",
-                      static_cast<int>(reader.GetConfigSourceName().length()),
-                      reader.GetConfigSourceName().data(),
-                      reader.GetLastReadConfigLineNumber()));
+                  AppendErrorMessage(
+                      readState,
+                      Strings::Format(
+                          L"%.*s(%u): Internal error while processing configuration setting.",
+                          static_cast<int>(reader.GetConfigSourceName().length()),
+                          reader.GetConfigSourceName().data(),
+                          reader.GetLastReadConfigLineNumber()));
                   break;
               }
             }
             break;
 
           default:
-            AppendErrorMessage(Strings::Format(
-                L"%.*s(%u): Internal error while processing line.",
-                static_cast<int>(reader.GetConfigSourceName().length()),
-                reader.GetConfigSourceName().data(),
-                reader.GetLastReadConfigLineNumber()));
+            AppendErrorMessage(
+                readState,
+                Strings::Format(
+                    L"%.*s(%u): Internal error while processing line.",
+                    static_cast<int>(reader.GetConfigSourceName().length()),
+                    reader.GetConfigSourceName().data(),
+                    reader.GetLastReadConfigLineNumber()));
             break;
         }
 
@@ -1246,25 +1470,27 @@ namespace Infra
 
         if (true == reader.IsError())
         {
-          AppendErrorMessage(Strings::Format(
-              L"%.*s(%u): I/O error while reading.",
-              static_cast<int>(reader.GetConfigSourceName().length()),
-              reader.GetConfigSourceName().data(),
-              reader.GetLastReadConfigLineNumber()));
+          AppendErrorMessage(
+              readState,
+              Strings::Format(
+                  L"%.*s(%u): I/O error while reading.",
+                  static_cast<int>(reader.GetConfigSourceName().length()),
+                  reader.GetConfigSourceName().data(),
+                  reader.GetLastReadConfigLineNumber()));
           return;
         }
         else if (false == configLineReadResult)
         {
-          AppendErrorMessage(Strings::Format(
-              L"%.*s(%u): Line is too long.",
-              static_cast<int>(reader.GetConfigSourceName().length()),
-              reader.GetConfigSourceName().data(),
-              reader.GetLastReadConfigLineNumber()));
+          AppendErrorMessage(
+              readState,
+              Strings::Format(
+                  L"%.*s(%u): Line is too long.",
+                  static_cast<int>(reader.GetConfigSourceName().length()),
+                  reader.GetConfigSourceName().data(),
+                  reader.GetLastReadConfigLineNumber()));
           return;
         }
       }
-
-      EndRead();
     }
 
     std::wstring ConfigurationData::ToConfigurationFileString(void) const

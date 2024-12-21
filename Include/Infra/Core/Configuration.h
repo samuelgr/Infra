@@ -98,10 +98,6 @@ namespace Infra
       StringMultiValue,
     };
 
-    /// Interface for reading from a configuration file. Abstracts away the details of reading from
-    /// various sources, including files and memory buffers. For internal use only.
-    class ConfigSourceReaderBase;
-
     /// Fully defines an action to take in response to a section or a value being read. Combines an
     /// action with a possible error message.
     class Action
@@ -926,6 +922,9 @@ namespace Infra
       TSections sections;
     };
 
+    /// Internal structure for holding the state of an overall configuration file read operation.
+    struct SReadState;
+
     /// Interface for reading and parsing INI-formatted configuration files.
     /// Name-and-value pairs (of the format "name = value") are namespaced by sections (of the
     /// format "[section name]"). Provides basic configuration file reading and parsing
@@ -1061,17 +1060,30 @@ namespace Infra
 
     private:
 
-      /// Type alias for a container that keeps track of section names that have already been seen.
-      using TSeenSections =
-          std::set<std::wstring, Strings::CaseInsensitiveLessThanComparator<wchar_t>>;
-
-      /// Internal structure for holding the state of an overall configuration file read operation.
-      struct SReadState;
-
       /// Appends an error message into the list of error messages associated with the file read
       /// attempt. Each such error message is a semantically-rich description of an error that
       /// occurred during the configuration file read attempt that fills this object.
-      void AppendErrorMessage(std::wstring_view errorMessage);
+      /// @param [in] readState Structure that keeps track of the state of the overall read
+      /// operation.
+      /// @param [in] errorMessage Error message to append.
+      void AppendErrorMessage(const SReadState& readState, std::wstring_view errorMessage);
+
+      /// Implements an "include" directive in a configuration file.
+      /// @param [in,out] readState Structure that keeps track of the state of the overall read
+      /// operation.
+      /// @param [in] configFileToInclude String that identifies the configuration file to be
+      /// included, usually a path.
+      void HandleIncludeDirective(SReadState& readState, std::wstring_view configFileToInclude);
+
+      /// Internal implementation of parsing and possibly acting on a directive represented in a
+      /// configuration file line. Directives begin with the '%' character and modify how
+      /// configuration files are processed, such as by including another file, skipping over lines,
+      /// and so on.
+      /// @param [in,out] readState Structure that keeps track of the state of the overall read
+      /// operation.
+      /// @param [in] configLineTrimmed Unparsed configuration line, as read from the configuration
+      /// file, with whitespace trimmed.
+      void ParseAndMaybeHandleDirective(SReadState& readState, std::wstring_view configLineTrimmed);
 
       /// Internal implementation of parsing, querying subclasses for the desired action, and
       /// possibly inserting a section read from a configuration file into a configuration data
@@ -1086,20 +1098,15 @@ namespace Infra
       /// possibly inserting a value read from a configuration file into a configuration data
       /// object.
       /// @tparam ValueType Type of value to be parsed and possibly inserted.
-      /// @param [in] reader Low-level configuration source reader object, borrowed from the caller
-      /// for querying only.
-      /// @param [in,out] configToFill Configuration data object into which to attempt to insert the
-      /// parsed configuration value.
-      /// @param [in] section Name of the secton that contains the configuration setting.
+      /// @param [in,out] readState Structure that keeps track of the state of the overall read
+      /// operation.
       /// @param [in] name Name of the configuration setting.
       /// @param [in] valueType Type enumerator for the value to be parsed and possibly inserted.
       /// This is a separate parameter from the template parameter because it additionally allows
       /// single- or multi-valued to be specified.
       /// @param [in] valueUnparsed Unparsed value read directly from the configuration file.
       template <typename ValueType> void ParseAndMaybeInsertValue(
-          const ConfigSourceReaderBase& reader,
-          ConfigurationData& configToFill,
-          std::wstring_view section,
+          SReadState& readState,
           std::wstring_view name,
           EValueType valueType,
           std::wstring_view valueUnparsed);
