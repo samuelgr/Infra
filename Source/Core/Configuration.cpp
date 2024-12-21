@@ -235,6 +235,10 @@ namespace Infra
       /// Configuration data to be filled during the read operation.
       ConfigurationData configToFill;
 
+      /// Set of currently-open configuration file sources. Used for include cycle detection.
+      std::set<std::wstring_view, Strings::CaseInsensitiveLessThanComparator<wchar_t>>
+          openConfigSources;
+
       /// Set of all sections whose names have already been seen. Used to detect duplicate sections.
       std::set<std::wstring, Strings::CaseInsensitiveLessThanComparator<wchar_t>> seenSections;
 
@@ -1073,6 +1077,7 @@ namespace Infra
         return ConfigurationData();
       }
 
+      readState.openConfigSources.emplace(fileReader->GetConfigSourceName());
       readState.readers.EmplaceBack(std::move(fileReader));
 
       BeginRead();
@@ -1091,6 +1096,7 @@ namespace Infra
       errorMessages.reset();
       std::unique_ptr<ConfigSourceReader> memoryBufferReader =
           std::make_unique<MemoryBufferReader>(configBuffer);
+      readState.openConfigSources.emplace(memoryBufferReader->GetConfigSourceName());
       readState.readers.EmplaceBack(std::move(memoryBufferReader));
 
       BeginRead();
@@ -1150,6 +1156,20 @@ namespace Infra
                   configFileToInclude.data()));
           return;
         }
+      }
+
+      if (readState.openConfigSources.contains(nextReader->GetConfigSourceName()))
+      {
+        AppendErrorMessage(
+            readState,
+            Strings::Format(
+                L"%.*s(%u): %.*s: Cyclical include.",
+                static_cast<int>(reader.GetConfigSourceName().length()),
+                reader.GetConfigSourceName().data(),
+                reader.GetLastReadConfigLineNumber(),
+                static_cast<int>(configFileToInclude.length()),
+                configFileToInclude.data()));
+        return;
       }
 
       readState.readers.EmplaceBack(std::move(nextReader));

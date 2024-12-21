@@ -994,4 +994,24 @@ namespace CoreInfraTest
     TEST_ASSERT(actualConfigData == expectedConfigData);
     TEST_ASSERT(false == testConfigReader.HasErrorMessages());
   }
+
+  // Verifies that cycles in the include graph are properly detected and reported as an error.
+  TEST_CASE(Configuration_ConfigurationFileReader_IncludeDirective_CycleDetection)
+  {
+    TemporaryString configFile1;
+    TemporaryString configFile2;
+    TemporaryString configFile3;
+
+    configFile1 << L"%include inmemory://" << reinterpret_cast<size_t>(configFile2.Data());
+    configFile2 << L"%include inmemory://" << reinterpret_cast<size_t>(configFile3.Data());
+    configFile3 << L"%include inmemory://" << reinterpret_cast<size_t>(configFile1.Data());
+
+    TestConfigurationFileReader testConfigReader;
+    const ConfigurationData configData =
+        testConfigReader.ReadInMemoryConfigurationFile(configFile1);
+    PrintReadErrorMessages(testConfigReader);
+    TEST_ASSERT(true == testConfigReader.HasErrorMessages());
+    // TEST_ASSERT(4 == testConfigReader.GetErrorMessages().size());
+    return;
+  }
 } // namespace CoreInfraTest
