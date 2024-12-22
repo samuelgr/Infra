@@ -1022,4 +1022,31 @@ namespace CoreInfraTest
     testConfigReader.LogAllErrorMessages();
     TEST_ASSERT(false == testConfigReader.HasErrorMessages());
   }
+
+  // Verifies that cycles in the include graph are properly detected and reported as an error. This
+  // is also expected to be an error when using a "tryinclude" directive because only file-not-found
+  // errors are suppressed.
+  TEST_CASE(Configuration_ConfigurationFileReader_TryIncludeDirective_CycleDetection)
+  {
+    TemporaryString configFile1;
+    TemporaryString configFile2;
+    TemporaryString configFile3;
+    TemporaryString configFile4;
+
+    configFile1 << L"%tryinclude inmemory://" << reinterpret_cast<size_t>(configFile2.Data());
+    configFile2 << L"%tryinclude inmemory://" << reinterpret_cast<size_t>(configFile3.Data());
+    configFile3 << L"%tryinclude inmemory://" << reinterpret_cast<size_t>(configFile4.Data());
+    configFile4 << L"%tryinclude inmemory://" << reinterpret_cast<size_t>(configFile2.Data());
+
+    TestConfigurationFileReader testConfigReader;
+    const ConfigurationData configData =
+        testConfigReader.ReadInMemoryConfigurationFile(configFile1);
+    testConfigReader.LogAllErrorMessages();
+    TEST_ASSERT(true == testConfigReader.HasErrorMessages());
+
+    // The first error message should be about a cycle.
+    TEST_ASSERT(
+        (true == testConfigReader.GetErrorMessages().front().contains(L"Cyclical")) ||
+        (true == testConfigReader.GetErrorMessages().front().contains(L"cyclical")));
+  }
 } // namespace CoreInfraTest
