@@ -1181,7 +1181,7 @@ namespace Infra
         AppendErrorMessage(
             readState,
             Strings::Format(
-                L"%.*s(%u): %.*s: Missing operand.",
+                L"%.*s(%u): %%%.*s: Missing operand.",
                 static_cast<int>(reader.GetConfigSourceName().length()),
                 reader.GetConfigSourceName().data(),
                 reader.GetLastReadConfigLineNumber(),
@@ -1251,12 +1251,14 @@ namespace Infra
         AppendErrorMessage(
             readState,
             Strings::Format(
-                L"%.*s(%u): %.*s: Cyclical include.",
+                L"%.*s(%u): Cyclical %%%.*s: file \"%.*s\" is already open.",
                 static_cast<int>(reader.GetConfigSourceName().length()),
                 reader.GetConfigSourceName().data(),
                 reader.GetLastReadConfigLineNumber(),
-                static_cast<int>(configFileToInclude.length()),
-                configFileToInclude.data()));
+                static_cast<int>(directiveString.length()),
+                directiveString.data(),
+                static_cast<int>(nextConfigSourceName.length()),
+                nextConfigSourceName.data()));
         return;
       }
 
