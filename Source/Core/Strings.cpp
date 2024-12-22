@@ -395,5 +395,35 @@ namespace Infra
 
     template std::string_view TrimTrailingWhitespace(std::string_view str);
     template std::wstring_view TrimTrailingWhitespace(std::wstring_view str);
+
+    std::optional<TemporaryString> UserFriendlyAbsolutePathForOpenFile(HANDLE fileHandle)
+    {
+      TemporaryString fullFileName;
+      fullFileName.UnsafeSetSize(GetFinalPathNameByHandleW(
+          fileHandle,
+          fullFileName.Data(),
+          fullFileName.Capacity(),
+          (FILE_NAME_NORMALIZED | VOLUME_NAME_DOS)));
+
+      // The `GetFinalPathNameByHandleW` function will generally return a path with a namespace
+      // prefix. For improved user-friendliness, that prefix should be removed. For network
+      // paths, Windows generally uses a "UNC" prefix, which is more user-friendly if replaced
+      // with the "\\" prefix that can be typed into the File Explorer address bar.
+
+      std::wstring_view fullFileNameWithoutPrefix = fullFileName.AsStringView();
+      if (true == Strings::StartsWithCaseInsensitive<wchar_t>(fullFileName, L"\\\\?\\UNC\\"))
+      {
+        fullFileName.ReplacePrefix(L"      \\\\");
+        fullFileNameWithoutPrefix.remove_prefix(6);
+      }
+      else if ((true == fullFileName.AsStringView().starts_with(L"\\??\\") ||
+                (true == fullFileName.AsStringView().starts_with(L"\\\\?\\"))))
+      {
+        fullFileNameWithoutPrefix.remove_prefix(4);
+      }
+
+      if (true == fullFileNameWithoutPrefix.empty()) return std::nullopt;
+      return fullFileNameWithoutPrefix;
+    }
   } // namespace Strings
 } // namespace Infra

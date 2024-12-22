@@ -11,6 +11,8 @@
 
 #include "Core/Configuration.h"
 
+#include <io.h>
+
 #include <algorithm>
 #include <climits>
 #include <cstdint>
@@ -155,6 +157,25 @@ namespace Infra
           : ConfigSourceReader(), fileName(fileName), fileHandle(nullptr)
       {
         _wfopen_s(&fileHandle, this->fileName.c_str(), L"r,ccs=UTF-8");
+
+        if (nullptr != fileHandle)
+        {
+          // The name of the newly-opened file must be resolved to a full absolute path so that it
+          // can be uniquely identified. This is to handle any relative path components that may
+          // have been present in the input.
+
+          std::optional<TemporaryString> maybeFullFileName =
+              Strings::UserFriendlyAbsolutePathForOpenFile(
+                  reinterpret_cast<HANDLE>(_get_osfhandle(_fileno(fileHandle))));
+          if (false == maybeFullFileName.has_value())
+          {
+            fclose(fileHandle);
+            fileHandle = nullptr;
+            return;
+          }
+
+          this->fileName = *maybeFullFileName;
+        }
       }
 
       FileReader(const FileReader& other) = delete;

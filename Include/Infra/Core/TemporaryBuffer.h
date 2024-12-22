@@ -604,6 +604,24 @@ namespace Infra
       return (Size() >= (Capacity() - 1));
     }
 
+    /// Replaces the beginning of the string with the specified replacement string.
+    /// If the length of the replacement string exceeds the length of the existing string then
+    /// the entire string is replaced.
+    /// @param [in] replacementPrefix String with which to replace the beginning of the current
+    /// string.
+    inline void ReplacePrefix(std::wstring_view replacementPrefix)
+    {
+      if (replacementPrefix.size() >= Size())
+      {
+        *this = replacementPrefix;
+      }
+      else
+      {
+        for (unsigned int i = 0; i < static_cast<unsigned int>(replacementPrefix.size()); ++i)
+          (*this)[i] = replacementPrefix[i];
+      }
+    }
+
     /// Replaces the end of the string with the specified replacement string.
     /// If the length of the replacement string exceeds the length of the existing string then
     /// the entire string is replaced.

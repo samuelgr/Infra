@@ -246,6 +246,14 @@ namespace Infra
       return TrimTrailingWhitespace(TrimLeadingWhitespace(str));
     }
 
+    /// Retrieves a user-friendly path for the open file represented by the specified handle. In
+    /// this context, "user-friendly" means that local files begin with a drive letter, and files
+    /// available over the network begin with a "\\" prefix to the server name.
+    /// @param [in] fileHandle File handle for which the user-friendly path is desired.
+    /// @return User-friendly path that corresponds to the specified handle, if it could be
+    /// determined.
+    std::optional<TemporaryString> UserFriendlyAbsolutePathForOpenFile(HANDLE fileHandle);
+
     /// Case-insensitive hasher for various kinds of string representations. This is a
     /// type-transparent hasher for all string representations that are implicitly convertable
     /// to string views.

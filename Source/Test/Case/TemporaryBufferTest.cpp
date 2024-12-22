@@ -209,6 +209,24 @@ namespace CoreInfraTest
     TEST_ASSERT(actualConvertedStr == expectedConvertedStr);
   }
 
+  // Verifies that prefix replacement works correctly when the replacement prefix is shorter than
+  // the existing string.
+  TEST_CASE(TemporaryString_ReplacePrefix_ShorterThanExisting)
+  {
+    TemporaryString testString = L"ABCD is a test string";
+    testString.ReplacePrefix(L"This");
+    TEST_ASSERT(L"This is a test string" == testString);
+  }
+
+  // Verifies that prefix replacement works correctly when the replacement prefix is longer than the
+  // existing string.
+  TEST_CASE(TemporaryString_ReplacePrefix_LongerThanExisting)
+  {
+    TemporaryString testString = L"somestring";
+    testString.ReplacePrefix(L"This is a test string");
+    TEST_ASSERT(L"This is a test string" == testString);
+  }
+
   // Verifies that suffix replacement works correctly when the replacement suffix is shorter than
   // the existing string.
   TEST_CASE(TemporaryString_ReplaceSuffix_ShorterThanExisting)
