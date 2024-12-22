@@ -8,11 +8,12 @@
         <DisplayString Condition="type == EValueType::Integer || type == EValueType::IntegerMultiValue">{intValue}</DisplayString>
         <DisplayString Condition="type == EValueType::String || type == EValueType::StringMultiValue">{stringValue}</DisplayString>
         <Expand>
-            <Item Name="lineNumber" Condition="lineNumber &gt; 0">lineNumber</Item>
             <Item Name="type">type</Item>
             <Item Name="value" Condition="type == EValueType::Boolean || type == EValueType::BooleanMultiValue" >boolValue</Item>
             <Item Name="value" Condition="type == EValueType::Integer || type == EValueType::IntegerMultiValue" >intValue</Item>
             <Item Name="value" Condition="type == EValueType::String || type == EValueType::StringMultiValue" >stringValue</Item>
+            <Item Name="configSourceName">configSourceName</Item>
+            <Item Name="configSourceLineNumber">configSourceLineNumber</Item>
         </Expand>
     </Type>
 

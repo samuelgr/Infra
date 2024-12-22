@@ -274,8 +274,8 @@ namespace CoreInfraTest
 
     const Value testConfigValue(
         kTestInteger, EValueType::Integer, kTestConfigFileName, kTestLineNumber);
-    TEST_ASSERT(kTestConfigFileName == testConfigValue.GetConfigFileName());
-    TEST_ASSERT(kTestLineNumber == testConfigValue.GetConfigFileLineNumber());
+    TEST_ASSERT(kTestConfigFileName == testConfigValue.GetConfigSourceName());
+    TEST_ASSERT(kTestLineNumber == testConfigValue.GetConfigSourceLineNumber());
   }
 
   // Verifies that comparison works correctly between Value objects and underlying values of the
@@ -623,6 +623,30 @@ namespace CoreInfraTest
         L"Setting4 = 8\n";
     const auto actualConfigFileString = testConfigData.ToConfigurationFileString();
     TEST_ASSERT(actualConfigFileString == expectedConfigFileString);
+  }
+
+  // Verifies that a valid configuration file is successfully read and metadata items are properly
+  // populated.
+  TEST_CASE(Configuration_ConfigurationFileReader_MetadataPopulated)
+  {
+    constexpr std::wstring_view kTestConfigFile =
+        L"[Section1]\n"
+        L"IntegerSetting = 66\n"
+        L"BooleanSetting = true\n";
+    const TemporaryString expectedConfigSourceNameContents =
+        Infra::Strings::Format(L"%zx", reinterpret_cast<size_t>(kTestConfigFile.data()));
+
+    TestConfigurationFileReader testConfigReader;
+    const ConfigurationData testConfigData =
+        testConfigReader.ReadInMemoryConfigurationFile(kTestConfigFile);
+
+    TEST_ASSERT(testConfigData[L"Section1"][L"IntegerSetting"]->GetConfigSourceName().contains(
+        expectedConfigSourceNameContents));
+    TEST_ASSERT(testConfigData[L"Section1"][L"IntegerSetting"]->GetConfigSourceLineNumber() == 2);
+
+    TEST_ASSERT(testConfigData[L"Section1"][L"BooleanSetting"]->GetConfigSourceName().contains(
+        expectedConfigSourceNameContents));
+    TEST_ASSERT(testConfigData[L"Section1"][L"BooleanSetting"]->GetConfigSourceLineNumber() == 3);
   }
 
   // Verifies that a valid configuration file is successfully read and all lines are properly

@@ -224,10 +224,10 @@ namespace Infra
       inline Value(
           IntegerType value,
           EValueType type = EValueType::Integer,
-          std::wstring_view configFileName = std::wstring_view(),
-          int lineNumber = 0)
-          : configFileName(configFileName),
-            lineNumber(lineNumber),
+          std::wstring_view configSourceName = std::wstring_view(),
+          int configSourceLineNumber = 0)
+          : configSourceName(configSourceName),
+            configSourceLineNumber(configSourceLineNumber),
             type(type),
             intValue(static_cast<TIntegerValue>(value))
       {
@@ -240,9 +240,12 @@ namespace Infra
       inline Value(
           BooleanType value,
           EValueType type = EValueType::Boolean,
-          std::wstring_view configFileName = std::wstring_view(),
-          int lineNumber = 0)
-          : configFileName(configFileName), lineNumber(lineNumber), type(type), boolValue(value)
+          std::wstring_view configSourceName = std::wstring_view(),
+          int configSourceLineNumber = 0)
+          : configSourceName(configSourceName),
+            configSourceLineNumber(configSourceLineNumber),
+            type(type),
+            boolValue(value)
       {
         DebugAssert(TypeIsBoolean(), "Mismatch between value and type enumerator.");
       }
@@ -253,9 +256,12 @@ namespace Infra
       inline Value(
           StringType value,
           EValueType type = EValueType::String,
-          std::wstring_view configFileName = std::wstring_view(),
-          int lineNumber = 0)
-          : configFileName(configFileName), lineNumber(lineNumber), type(type), stringValue(value)
+          std::wstring_view configSourceName = std::wstring_view(),
+          int configSourceLineNumber = 0)
+          : configSourceName(configSourceName),
+            configSourceLineNumber(configSourceLineNumber),
+            type(type),
+            stringValue(value)
       {
         DebugAssert(TypeIsString(), "Mismatch between value and type enumerator.");
       }
@@ -264,10 +270,10 @@ namespace Infra
       inline Value(
           TStringValue&& value,
           EValueType type = EValueType::String,
-          std::wstring_view configFileName = std::wstring_view(),
-          int lineNumber = 0)
-          : configFileName(configFileName),
-            lineNumber(lineNumber),
+          std::wstring_view configSourceName = std::wstring_view(),
+          int configSourceLineNumber = 0)
+          : configSourceName(configSourceName),
+            configSourceLineNumber(configSourceLineNumber),
             type(type),
             stringValue(std::move(value))
       {
@@ -363,17 +369,20 @@ namespace Infra
       /// @return Extracted value.
       TStringValue ExtractString(void);
 
-      inline std::wstring_view GetConfigFileName(void) const
+      /// Retrieves and returns the name of the configuration source from which this value was
+      /// obtained.
+      /// @return Name of the configuration source from which this value was obtained.
+      inline std::wstring_view GetConfigSourceName(void) const
       {
-        return configFileName;
+        return configSourceName;
       }
 
-      /// Retrieves and returns the line number within the configuration file on which this
+      /// Retrieves and returns the line number within the configuration source on which this
       /// value was located.
       /// @return Line number that corresponds to this value.
-      inline int GetConfigFileLineNumber(void) const
+      inline int GetConfigSourceLineNumber(void) const
       {
-        return lineNumber;
+        return configSourceLineNumber;
       }
 
       /// Retrieves and returns the type of the stored value.
@@ -405,10 +414,10 @@ namespace Infra
     private:
 
       /// Name of the configuration file on which this value was located.
-      std::wstring_view configFileName;
+      std::wstring_view configSourceName;
 
       /// Line number within the configuration file on which this value was located.
-      int lineNumber;
+      int configSourceLineNumber;
 
       /// Indicates the value type.
       EValueType type;
@@ -806,6 +815,11 @@ namespace Infra
     {
     public:
 
+      /// Alias for the underlying data structure used to hold all configuration source names that
+      /// were read in creating this configuration data object. Names are all case-insensitive.
+      using TConfigSourceNames =
+          std::set<std::wstring, Strings::CaseInsensitiveLessThanComparator<wchar_t>>;
+
       /// Alias for the underlying data structure used to store top-level configuration
       /// section data. Names of sections are case-insensitive.
       using TSections =
@@ -830,7 +844,7 @@ namespace Infra
         return ((sections.cend() == sectionsIter) ? kEmptySection : sectionsIter->second);
       }
 
-      bool operator==(const ConfigurationData& rhs) const = default;
+      bool operator==(const ConfigurationData& rhs) const;
 
       /// Clears all of the stored configuration data.
       inline void Clear(void)
@@ -887,18 +901,101 @@ namespace Infra
         return ExtractSection(sectionIterator);
       }
 
-      /// Stores a new value for the specified configuration setting in the specified section
-      /// by moving the input parameter. Will fail if the value already exists.
+      /// Stores a new value for the specified configuration setting in the specified
+      /// section. Will fail if the value already exists.
       /// @param [in] section Section into which to insert the configuration setting.
       /// @param [in] name Name of the configuration setting into which to insert the value.
       /// @param [in] value Value to insert.
+      /// @param [in] valueType Type enumerator for the value to be parsed and possibly inserted.
+      /// This is a separate parameter because it additionally allows single- or multi-valued to be
+      /// specified. Defaults to the correct single-valued enumerator for this overload.
+      /// @param [in] configSourceName Name of the configuration data source, such as a
+      /// configuration file. Defaults to empty.
+      /// @param [in] configSourceLineNumber Line number within the configuration data source of the
+      /// value being inserted. Defaults to 0.
       /// @return `true` on success, `false` on failure.
-      inline bool Insert(std::wstring_view section, std::wstring_view name, Value&& value)
+      template <typename IntegerType>
+        requires IsIntegerType<IntegerType>
+      inline bool Insert(
+          std::wstring_view section,
+          std::wstring_view name,
+          IntegerType intValue,
+          EValueType valueType = EValueType::Integer,
+          std::wstring_view configSourceName = L"",
+          int configSourceLineNumber = 0)
       {
-        auto sectionIterator = sections.find(section);
-        if (sections.end() == sectionIterator)
-          sectionIterator = sections.emplace(section, Section()).first;
-        return sectionIterator->second.Insert(name, std::move(value));
+        return InsertInternal(
+            section,
+            name,
+            Value(
+                static_cast<TIntegerValue>(intValue),
+                valueType,
+                *(configSourceNames.emplace(configSourceName).first),
+                configSourceLineNumber));
+      }
+
+      /// Stores a new Boolean value for the specified configuration setting in the specified
+      /// section. Will fail if the value already exists.
+      /// @param [in] section Section into which to insert the configuration setting.
+      /// @param [in] name Name of the configuration setting into which to insert the value.
+      /// @param [in] boolValue Value to insert.
+      /// @param [in] valueType Type enumerator for the value to be parsed and possibly inserted.
+      /// This is a separate parameter because it additionally allows single- or multi-valued to be
+      /// specified. Defaults to the correct single-valued enumerator for this overload.
+      /// @param [in] configSourceName Name of the configuration data source, such as a
+      /// configuration file. Defaults to empty.
+      /// @param [in] configSourceLineNumber Line number within the configuration data source of the
+      /// value being inserted. Defaults to 0.
+      /// @return `true` on success, `false` on failure.
+      template <typename BooleanType>
+        requires IsBooleanType<BooleanType>
+      inline bool Insert(
+          std::wstring_view section,
+          std::wstring_view name,
+          BooleanType boolValue,
+          EValueType valueType = EValueType::Boolean,
+          std::wstring_view configSourceName = L"",
+          int configSourceLineNumber = 0)
+      {
+        return InsertInternal(
+            section,
+            name,
+            Value(
+                static_cast<TBooleanValue>(boolValue),
+                valueType,
+                *(configSourceNames.emplace(configSourceName).first),
+                configSourceLineNumber));
+      }
+
+      /// Stores a new string value for the specified configuration setting in the specified
+      /// section. Will fail if the value already exists.
+      /// @param [in] section Section into which to insert the configuration setting.
+      /// @param [in] name Name of the configuration setting into which to insert the value.
+      /// @param [in] stringValue Value to insert.
+      /// @param [in] valueType Type enumerator for the value to be parsed and possibly inserted.
+      /// This is a separate parameter because it additionally allows single- or multi-valued to be
+      /// specified. Defaults to the correct single-valued enumerator for this overload.
+      /// @param [in] configSourceName Name of the configuration data source, such as a
+      /// configuration file. Defaults to empty.
+      /// @param [in] configSourceLineNumber Line number within the configuration data source of the
+      /// value being inserted. Defaults to 0.
+      /// @return `true` on success, `false` on failure.
+      inline bool Insert(
+          std::wstring_view section,
+          std::wstring_view name,
+          TStringValue&& stringValue,
+          EValueType valueType = EValueType::String,
+          std::wstring_view configSourceName = L"",
+          int configSourceLineNumber = 0)
+      {
+        return InsertInternal(
+            section,
+            name,
+            Value(
+                std::move(stringValue),
+                valueType,
+                *(configSourceNames.emplace(configSourceName).first),
+                configSourceLineNumber));
       }
 
       /// Determines if this configuration data object is empty (i.e. contains no
@@ -923,6 +1020,17 @@ namespace Infra
       std::wstring ToConfigurationFileString(void) const;
 
     private:
+
+      /// Internal implementation of storing a new value into this object.
+      /// @param [in] section Section into which to insert the configuration setting.
+      /// @param [in] name Name of the configuration setting into which to insert the value.
+      /// @param [in] value Value to insert.
+      /// @return `true` on success, `false` on failure.
+      bool InsertInternal(std::wstring_view section, std::wstring_view name, Value&& value);
+
+      /// Holds the names of all configuration sources from which values in this object were
+      /// obtained.
+      TConfigSourceNames configSourceNames;
 
       /// Holds configuration data at the level of entire sections, one element per section.
       TSections sections;

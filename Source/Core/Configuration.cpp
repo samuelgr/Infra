@@ -783,7 +783,9 @@ namespace Infra
     }
 
     Value::Value(const Value& other)
-        : configFileName(other.configFileName), lineNumber(other.lineNumber), type(other.type)
+        : configSourceName(other.configSourceName),
+          configSourceLineNumber(other.configSourceLineNumber),
+          type(other.type)
     {
       switch (other.type)
       {
@@ -808,8 +810,8 @@ namespace Infra
     }
 
     Value::Value(Value&& other) noexcept
-        : configFileName(std::move(other.configFileName)),
-          lineNumber(std::move(other.lineNumber)),
+        : configSourceName(std::move(other.configSourceName)),
+          configSourceLineNumber(std::move(other.configSourceLineNumber)),
           type(std::move(other.type))
     {
       switch (other.type)
@@ -1070,12 +1072,26 @@ namespace Infra
       return std::make_pair(std::move(extractedName.key()), std::move(extractedName.mapped()));
     }
 
+    bool ConfigurationData::operator==(const ConfigurationData& rhs) const
+    {
+      return (sections == rhs.sections);
+    }
+
     std::pair<std::wstring, Section> ConfigurationData::ExtractSection(
         TSections::const_iterator position)
     {
       auto extractedSection = sections.extract(position);
       return std::make_pair(
           std::move(extractedSection.key()), std::move(extractedSection.mapped()));
+    }
+
+    bool ConfigurationData::InsertInternal(
+        std::wstring_view section, std::wstring_view name, Value&& value)
+    {
+      auto sectionIterator = sections.find(section);
+      if (sections.end() == sectionIterator)
+        sectionIterator = sections.emplace(section, Section()).first;
+      return sectionIterator->second.Insert(name, std::move(value));
     }
 
     void ConfigurationFileReader::AppendErrorMessage(
@@ -1429,11 +1445,10 @@ namespace Infra
               readState.configToFill.Insert(
                   readState.currentSection,
                   name,
-                  Value(
-                      std::move(valueParsed),
-                      valueType,
-                      reader.GetConfigSourceName(),
-                      reader.GetLastReadConfigLineNumber())))
+                  std::move(valueParsed),
+                  valueType,
+                  reader.GetConfigSourceName(),
+                  reader.GetLastReadConfigLineNumber()))
             AppendErrorMessage(
                 readState,
                 Strings::Format(
