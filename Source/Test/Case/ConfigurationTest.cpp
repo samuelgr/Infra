@@ -1073,4 +1073,42 @@ namespace CoreInfraTest
         (true == testConfigReader.GetErrorMessages().front().contains(L"Cyclical")) ||
         (true == testConfigReader.GetErrorMessages().front().contains(L"cyclical")));
   }
+
+  // Verifies that macros are expanded correctly when they are all recognized and there are no
+  // errors in the input string.
+  TEST_CASE(Configuration_ConfigurationFileReader_ExpandAllMacros_Success)
+  {
+    constexpr std::wstring_view kInputString =
+        L"(  |  )$(ThisFileDirectory)  |  $(CoreInfraDirectory)  |  $(ExecutableBaseName)$\\(Some Other Escaped Text$(ExecutableDirectory)";
+    TemporaryString expectedExpandedString;
+    expectedExpandedString << L"(  |  )C:\\TestDir  |  "
+                           << Infra::ProcessInfo::GetThisModuleDirectoryName() << L"  |  "
+                           << Infra::ProcessInfo::GetExecutableBaseName()
+                           << L"$(Some Other Escaped Text"
+                           << Infra::ProcessInfo::GetExecutableDirectoryName();
+    auto actualExpandedString =
+        ConfigurationFileReader::ExpandAllMacros(kInputString, L"C:\\TestDir\\TestFile.ini");
+    TEST_ASSERT(true == actualExpandedString.HasValue());
+    TEST_ASSERT(actualExpandedString.Value() == expectedExpandedString);
+  }
+
+  // Verifies that macros fail to expand in the event of known errors in the input.
+  TEST_CASE(Configuration_ConfigurationFileReader_ExpandAllMacros_WithErrors)
+  {
+    // Unterminated macro
+    TEST_ASSERT(ConfigurationFileReader::ExpandAllMacros(L"$(ExecutableBaseName").HasError());
+
+    // Macro name not recognized
+    TEST_ASSERT(ConfigurationFileReader::ExpandAllMacros(L"$(__InvalidMacroName__)").HasError());
+  }
+
+  // Verifies that no expansion takes place if the input string contains no references.
+  TEST_CASE(Configuration_ConfigurationFileReader_ExpandAllMacros_NoMacroReferencesPresent)
+  {
+    constexpr std::wstring_view kInputString =
+        L"This is a test input string with no macro references present.";
+    auto expandResult = ConfigurationFileReader::ExpandAllMacros(kInputString);
+    TEST_ASSERT(true == expandResult.HasValue());
+    TEST_ASSERT(kInputString == expandResult.Value());
+  }
 } // namespace CoreInfraTest

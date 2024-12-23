@@ -26,6 +26,7 @@
 #include "DebugAssert.h"
 #include "Message.h"
 #include "Strings.h"
+#include "ValueOrError.h"
 
 /// Convenience wrapper around initializer list syntax for defining a configuration file section in
 /// a layout object. Specify a section name followed by a series of setting name and value type
@@ -1049,6 +1050,19 @@ namespace Infra
     public:
 
       virtual ~ConfigurationFileReader(void) = default;
+
+      /// Attempts to expands all macros present in the specified input string. Intended for
+      /// internal use, but exposed for testing.
+      /// @param [in] unexpandedString Unexpanded input string to be searched for macros.
+      /// @param [in] currentConfigSourceName Name of the current configuration source, which is
+      /// used to generate some of the macro expansions. Defaults to an empty string. If not
+      /// supplied or invalid, macros that reference the current configuration source name cannot be
+      /// expanded.
+      /// @return Either the input string with all macros fully expanded or an error message
+      /// explaining why the expansion failed.
+      static ValueOrError<TemporaryString, TemporaryString> ExpandAllMacros(
+          std::wstring_view unexpandedString,
+          std::wstring_view currentConfigSourceName = std::wstring_view());
 
       /// Retrieves and returns the error messages that arose during the configuration file
       /// read attempt that produced this object. Does not check that error messages

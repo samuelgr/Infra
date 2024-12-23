@@ -36,6 +36,7 @@
 #include "Core/ProcessInfo.h"
 #include "Core/Strings.h"
 #include "Core/TemporaryBuffer.h"
+#include "Core/ValueOrError.h"
 
 namespace Infra
 {
@@ -332,8 +333,6 @@ namespace Infra
       }
     };
 
-    constexpr int x = sizeof(SReadState);
-
     /// Determines and returns the canonical single-valued type for each possible multi-valued type
     /// enumerator.
     /// @param [in] valueType Type for which a canonical single-valued enumerator is desired.
@@ -602,6 +601,87 @@ namespace Infra
       }
 
       return ELineClassification::Error;
+    }
+
+    /// Generates and returns the name of the configuration file macro that references the directory
+    /// name of the product, which is the module that is running this code. This is just
+    /// "[ProductName]Dir"
+    /// @return Product directory macro string.
+    static std::wstring_view GetProductDirectoryMacroNameString(void)
+    {
+      static std::wstring productDirectoryMacroNameString;
+      static std::once_flag initFlag;
+
+      std::call_once(
+          initFlag,
+          []() -> void
+          {
+            std::wstring_view pieces[] = {ProcessInfo::GetProductName(), L"Directory"};
+
+            size_t totalLength = 0;
+            for (int i = 0; i < _countof(pieces); ++i)
+              totalLength += pieces[i].length();
+
+            productDirectoryMacroNameString.reserve(1 + totalLength);
+
+            for (int i = 0; i < _countof(pieces); ++i)
+              productDirectoryMacroNameString.append(pieces[i]);
+          });
+
+      return productDirectoryMacroNameString;
+    }
+
+    /// Expands a single configuration file macro and returns its definition, assuming the macro is
+    /// defined and its definition is available. Otherwise returns an error message string.
+    /// @param [in] macroName Name that identifies the macro to be expanded.
+    /// @param [in] currentConfigSourceName Name of the current configuration source, which is used
+    /// to generate some of the macro expansions.
+    /// @return Expanded macro, assuming the macro is known and defined, or an error message if not.
+    static ValueOrError<std::wstring_view, TemporaryString> ExpandSingleMacro(
+        std::wstring_view macroName, std::wstring_view currentConfigSourceName)
+    {
+      if (Strings::EqualsCaseInsensitive<wchar_t>(GetProductDirectoryMacroNameString(), macroName))
+      {
+        return ValueOrError<std::wstring_view, TemporaryString>::MakeValue(
+            ProcessInfo::GetThisModuleDirectoryName());
+      }
+      else if (Strings::EqualsCaseInsensitive<wchar_t>(L"ExecutableDirectory", macroName))
+      {
+        return ValueOrError<std::wstring_view, TemporaryString>::MakeValue(
+            ProcessInfo::GetExecutableDirectoryName());
+      }
+      else if (Strings::EqualsCaseInsensitive<wchar_t>(L"ExecutableBaseName", macroName))
+      {
+        return ValueOrError<std::wstring_view, TemporaryString>::MakeValue(
+            ProcessInfo::GetExecutableBaseName());
+      }
+      else if (Strings::EqualsCaseInsensitive<wchar_t>(L"ThisFileDirectory", macroName))
+      {
+        const size_t lastBackslashPosition = currentConfigSourceName.find_last_of(L'\\');
+        if (std::wstring_view::npos == lastBackslashPosition)
+          return ValueOrError<std::wstring_view, TemporaryString>::MakeError(Strings::Format(
+              L"%.*s: Directory name not available.",
+              static_cast<int>(macroName.length()),
+              macroName.data()));
+        return ValueOrError<std::wstring_view, TemporaryString>::MakeValue(
+            currentConfigSourceName.substr(0, lastBackslashPosition));
+      }
+      else if (Strings::EqualsCaseInsensitive<wchar_t>(L"ThisFileBaseName", macroName))
+      {
+        const size_t lastBackslashPosition = currentConfigSourceName.find_last_of(L'\\');
+        if (std::wstring_view::npos == lastBackslashPosition)
+          return ValueOrError<std::wstring_view, TemporaryString>::MakeError(Strings::Format(
+              L"%.*s: Base name not available.",
+              static_cast<int>(macroName.length()),
+              macroName.data()));
+        return ValueOrError<std::wstring_view, TemporaryString>::MakeValue(
+            currentConfigSourceName.substr(1 + lastBackslashPosition));
+      }
+      else
+      {
+        return ValueOrError<std::wstring_view, TemporaryString>::MakeError(Strings::Format(
+            L"%.*s: Unrecognized macro.", static_cast<int>(macroName.length()), macroName.data()));
+      }
     }
 
     /// Parses a value from the supplied input string. Default implementation does nothing and
@@ -1123,6 +1203,65 @@ namespace Infra
       }
     }
 
+    ValueOrError<TemporaryString, TemporaryString> ConfigurationFileReader::ExpandAllMacros(
+        std::wstring_view unexpandedString, std::wstring_view currentConfigSourceName)
+    {
+      TemporaryString expandedString;
+
+      bool maybeInsideMacroName = false;
+      for (std::wstring_view unexpandedStringPiece : Strings::Tokenizer(unexpandedString, L"$"))
+      {
+        if (false == maybeInsideMacroName)
+        {
+          // This will only be true the first time through the loop. The first string piece cannot
+          // possibly be a macro reference, even if a macro reference is at the start of the
+          // unexpanded string. In that case, the first piece will be an empty string.
+          expandedString += unexpandedStringPiece;
+        }
+        else
+        {
+          if (true == unexpandedStringPiece.starts_with(L"\\("))
+          {
+            // The macro reference could be a false positive. If it looks something like
+            // "$\(some_text..." then the user is requesting a literal '$' sign and a literal open
+            // bracket, due to the escape sequence.
+            unexpandedStringPiece.remove_prefix(2);
+            expandedString << L"$(" << unexpandedStringPiece;
+          }
+          else if (false == unexpandedStringPiece.starts_with(L'('))
+          {
+            // The macro reference could be a false positive. If it is a '$' sign and is not
+            // followed by an opening bracket, then the user is requesting a literal '$' sign and
+            // then whatever else is in the current piece.
+            expandedString << L'$' << unexpandedStringPiece;
+          }
+          else
+          {
+            const size_t closingBracketPosition = unexpandedStringPiece.find_first_of(L')');
+            if (std::wstring_view::npos == closingBracketPosition)
+              return ValueOrError<TemporaryString, TemporaryString>::MakeError(
+                  L"Unterminated macro reference.");
+
+            const std::wstring_view referencedMacroName =
+                unexpandedStringPiece.substr(1, closingBracketPosition - 1);
+            const std::wstring_view remainingStringPiece =
+                unexpandedStringPiece.substr(1 + closingBracketPosition);
+
+            auto expandedMacro = ExpandSingleMacro(referencedMacroName, currentConfigSourceName);
+            if (true == expandedMacro.HasError())
+              return ValueOrError<TemporaryString, TemporaryString>::MakeError(
+                  std::move(expandedMacro.Error()));
+
+            expandedString << expandedMacro.Value() << remainingStringPiece;
+          }
+        }
+
+        maybeInsideMacroName = true;
+      }
+
+      return ValueOrError<TemporaryString, TemporaryString>::MakeValue(std::move(expandedString));
+    }
+
     void ConfigurationFileReader::LogAllErrorMessages(
         int indentNumSpaces, Message::ESeverity severity) const
     {
@@ -1206,7 +1345,24 @@ namespace Infra
         return;
       }
 
-      std::wstring_view configFileToInclude = *maybeParamsString;
+      auto maybeExpandedParamsString =
+          ExpandAllMacros(*maybeParamsString, reader.GetConfigSourceName());
+      if (true == maybeExpandedParamsString.HasError())
+      {
+        AppendErrorMessage(
+            readState,
+            Strings::Format(
+                L"%.*s(%u): %%%.*s: %s",
+                static_cast<int>(reader.GetConfigSourceName().length()),
+                reader.GetConfigSourceName().data(),
+                reader.GetLastReadConfigLineNumber(),
+                static_cast<int>(directiveString.length()),
+                directiveString.data(),
+                maybeExpandedParamsString.Error().AsCString()));
+        return;
+      }
+
+      std::wstring_view configFileToInclude = maybeExpandedParamsString.Value().AsStringView();
       std::unique_ptr<ConfigSourceReader> nextReader;
 
       constexpr std::wstring_view kInMemoryConfigFilePrefix = L"inmemory://";
