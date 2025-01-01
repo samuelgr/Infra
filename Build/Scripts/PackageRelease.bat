@@ -6,7 +6,7 @@ rem | Infra
 rem |   Common infrastructure used by other projects.
 rem +-----------------------------------------------------------------------------------------------
 rem | Authored by Samuel Grossman
-rem | Copyright (c) 2016-2024
+rem | Copyright (c) 2016-2025
 rem +-----------------------------------------------------------------------------------------------
 rem | PackageRelease.bat
 rem |   Script for packaging up a release. To be executed after building the Release configuration

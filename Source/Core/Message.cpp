@@ -3,7 +3,7 @@
  *   Common infrastructure used by other projects.
  ***************************************************************************************************
  * Authored by Samuel Grossman
- * Copyright (c) 2016-2024
+ * Copyright (c) 2016-2025
  ***********************************************************************************************//**
  * @file Message.cpp
  *   Message output implementation.

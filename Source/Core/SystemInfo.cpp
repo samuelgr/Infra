@@ -3,7 +3,7 @@
  *   Common infrastructure used by other projects.
  ***************************************************************************************************
  * Authored by Samuel Grossman
- * Copyright (c) 2016-2024
+ * Copyright (c) 2016-2025
  ***********************************************************************************************//**
  * @file SystemInfo.cpp
  *   Implementation of functionality related to getting information about the system on which this
