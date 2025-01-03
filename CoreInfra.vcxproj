@@ -22,6 +22,7 @@
     <ClCompile Include="Source\Core\Configuration.cpp" />
     <ClCompile Include="Source\Core\Message.cpp" />
     <ClCompile Include="Source\Core\ProcessInfo.cpp" />
+    <ClCompile Include="Source\Core\Resolver.cpp" />
     <ClCompile Include="Source\Core\Strings.cpp" />
     <ClCompile Include="Source\Core\SystemInfo.cpp" />
     <ClCompile Include="Source\Core\TemporaryBuffer.cpp" />
@@ -34,6 +35,7 @@
     <ClInclude Include="Include\Infra\Core\Message.h" />
     <ClInclude Include="Include\Infra\Core\Mutex.h" />
     <ClInclude Include="Include\Infra\Core\ProcessInfo.h" />
+    <ClInclude Include="Include\Infra\Core\Resolver.h" />
     <ClInclude Include="Include\Infra\Core\Strings.h" />
     <ClInclude Include="Include\Infra\Core\SystemInfo.h" />
     <ClInclude Include="Include\Infra\Core\TemporaryBuffer.h" />
