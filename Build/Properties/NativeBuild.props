@@ -47,15 +47,6 @@
       <EnableFiberSafeOptimizations>false</EnableFiberSafeOptimizations>
       <WholeProgramOptimization>false</WholeProgramOptimization>
     </ClCompile>
-    <MASM>
-      <IncludePaths>$(MSBuildProjectDirectory)\Include\$(ProductName);$(MSBuildProjectDirectory)\Include\$(ProductName)\Internal;%(IncludePaths)</IncludePaths>
-      <EnableAssemblyGeneratedCodeListing>true</EnableAssemblyGeneratedCodeListing>
-      <ObjectFileName>$(IntDir)%(Filename)%(Extension).obj</ObjectFileName>
-      <AssembledCodeListingFile>$(IntDir)%(Filename)%(Extension).lst</AssembledCodeListingFile>
-      <ObjectFileName>$(IntDir)%(Filename)%(Extension).obj</ObjectFileName>
-      <PreserveIdentifierCase>1</PreserveIdentifierCase>
-      <GenerateDebugInformation>true</GenerateDebugInformation>
-    </MASM>
     <Link>
       <IncrementalLinkDatabaseFile>$(IntDir)$(TargetName)$(TargetExt).ilk</IncrementalLinkDatabaseFile>
       <LinkTimeCodeGenerationObjectFile>$(IntDir)$(TargetName)$(TargetExt).iobj</LinkTimeCodeGenerationObjectFile>
@@ -77,9 +68,6 @@
     <ClCompile>
       <AdditionalIncludeDirectories>$(MSBuildProjectDirectory)\Include\$(ProductName)\Test;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
-    <MASM>
-      <IncludePaths>$(MSBuildProjectDirectory)\Include\$(ProductName)\Test;%(IncludePaths)</IncludePaths>
-    </MASM>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)'=='Debug'">
     <ClCompile>
@@ -104,6 +92,10 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
     </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Platform)'=='Win32'">
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Platform)'=='x64'">
   </ItemDefinitionGroup>
   <ItemGroup />
 
