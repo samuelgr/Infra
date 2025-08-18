@@ -49,6 +49,10 @@
     <Natvis Include="Natvis\TemporaryBuffer.natvis" />
     <Natvis Include="Natvis\ValueOrError.natvis" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="Include\Infra\Core\Preamble.inc" />
+    <None Include="Include\Infra\Core\Registers.inc" />
+  </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>

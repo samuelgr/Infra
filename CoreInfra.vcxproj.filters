@@ -98,4 +98,12 @@
       <Filter>Visualization Files</Filter>
     </Natvis>
   </ItemGroup>
+  <ItemGroup>
+    <None Include="Include\Infra\Core\Preamble.inc">
+      <Filter>Header Files</Filter>
+    </None>
+    <None Include="Include\Infra\Core\Registers.inc">
+      <Filter>Header Files</Filter>
+    </None>
+  </ItemGroup>
 </Project>
