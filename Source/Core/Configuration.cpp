@@ -493,7 +493,9 @@ namespace Infra
         case L'.':
         case L';':
         case L':':
+        case L'/':
         case L'\'':
+        case L'\"':
         case L'\\':
         case L'{':
         case L'[':
