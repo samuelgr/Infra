@@ -133,6 +133,17 @@ if exist %output_dir% (
     rd /S /Q %output_dir%
 )
 
+if "yes"=="%has_distfiles%" (
+    if exist Distfiles\ (
+        echo.
+        echo Copied directories:
+        echo     Distfiles\
+        xcopy /E /I Distfiles\ "%output_dir%\Distfiles\" >NUL 2>NUL
+    ) else (
+        set distfiles_are_missing=yes
+    )
+)
+
 echo.
 echo Copied files:
 
@@ -215,6 +226,12 @@ if "yes"=="%project_has_third_party_license%" (
     )
 )
 popd
+
+if "yes"=="%distfiles_are_missing%" (
+    echo.
+    echo Missing directories:
+    echo     Distfiles\
+)
 
 if "yes"=="%files_are_missing%" (
     echo.
