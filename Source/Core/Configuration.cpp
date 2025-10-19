@@ -679,6 +679,11 @@ namespace Infra
         return ValueOrError<std::wstring_view, TemporaryString>::MakeValue(
             currentConfigSourceName.substr(1 + lastBackslashPosition));
       }
+      else if (Strings::EqualsCaseInsensitive<wchar_t>(L"WorkingDirectory", macroName))
+      {
+        return ValueOrError<std::wstring_view, TemporaryString>::MakeValue(
+            ProcessInfo::GetWorkingDirectory());
+      }
       else
       {
         return ValueOrError<std::wstring_view, TemporaryString>::MakeError(Strings::Format(

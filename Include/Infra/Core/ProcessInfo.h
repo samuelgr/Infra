@@ -193,5 +193,10 @@ namespace Infra
     /// located, without a trailing backslash.
     /// @return Directory name of the module that contains this code.
     std::wstring_view GetThisModuleDirectoryName(void);
+
+    /// Obtains the working directory that was set at the time this module first started running.
+    /// @return Absolute path of the working directory that was current at the time this module
+    /// started running, with no trailing backslash characters.
+    std::wstring_view GetWorkingDirectory(void);
   } // namespace ProcessInfo
 } // namespace Infra

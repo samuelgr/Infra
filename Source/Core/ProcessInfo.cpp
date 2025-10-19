@@ -34,6 +34,15 @@ namespace Infra
       SVersionInfo GetDefinedProductVersionInternal(void);
     } // namespace _ProductInformationInternal
 
+    // Internal variables that are initialized using the dynamic initialization pass. This ensures
+    // that the values of the relevant strings are filled at the latest during dynamic
+    // initialization (but they may be initialized earlier if the corresponding function is invoked
+    // explicitly).
+    namespace _UnusedInternal
+    {
+      static std::wstring_view workingDirectory = GetWorkingDirectory();
+    } // namespace _UnusedInternal
+
     HANDLE GetCurrentProcessHandle(void)
     {
       static HANDLE currentProcessHandle = GetCurrentProcess();
@@ -216,6 +225,26 @@ namespace Infra
           });
 
       return thisModuleDirectoryName;
+    }
+
+    std::wstring_view GetWorkingDirectory(void)
+    {
+      static std::wstring workingDirectory;
+      static std::once_flag initFlag;
+
+      std::call_once(
+          initFlag,
+          []() -> void
+          {
+            TemporaryBuffer<wchar_t> buf;
+            GetCurrentDirectoryW(static_cast<DWORD>(buf.Capacity()), buf.Data());
+
+            workingDirectory.assign(buf.Data());
+            while (workingDirectory.ends_with(L'\\'))
+              workingDirectory.pop_back();
+          });
+
+      return workingDirectory;
     }
   } // namespace ProcessInfo
 } // namespace Infra
