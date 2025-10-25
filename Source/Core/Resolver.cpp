@@ -324,28 +324,45 @@ namespace Infra
              {kStrReferenceDomainKnownFolderIdentifier, &ResolveKnownFolderIdentifier}})
   {}
 
-  bool Resolver::RegisterCustomDomain(std::wstring_view domain, TDefinitions&& definitions)
+  bool Resolver::RegisterCustomDomain(
+      std::wstring_view domain,
+      TDefinitions&& definitions,
+      std::optional<std::wstring_view> defaultValue)
   {
     if (true == domain.empty()) return false;
     return resolversByDomain
         .emplace(
             domain,
-            [this, definitions = std::move(definitions)](
+            [this, definitions = std::move(definitions), defaultValue](
                 std::wstring_view name) -> ResolvedStringOrError
             {
-              return ResolveCustomDomainVariable(name, definitions);
+              return ResolveCustomDomainVariable(name, definitions, defaultValue);
             })
         .second;
   }
 
   ResolvedStringOrError Resolver::ResolveCustomDomainVariable(
-      std::wstring_view name, const TDefinitions& definitions)
+      std::wstring_view name,
+      const TDefinitions& definitions,
+      std::optional<std::wstring_view> defaultValue)
   {
     const auto definitionIter = definitions.find(name);
-    if (definitions.cend() == definitionIter)
-      return ResolvedStringOrError::MakeError(Strings::Format(
-          L"%.*s: Unrecognized variable name", static_cast<int>(name.length()), name.data()));
-    ResolvedStringOrError resolvedDefinition = ResolveAllReferences(definitionIter->second);
+    std::wstring_view definition;
+
+    if (definitions.cend() != definitionIter)
+    {
+      definition = definitionIter->second;
+    }
+    else
+    {
+      if (true == defaultValue.has_value())
+        definition = *defaultValue;
+      else
+        return ResolvedStringOrError::MakeError(Strings::Format(
+            L"%.*s: Unrecognized variable name", static_cast<int>(name.length()), name.data()));
+    }
+
+    ResolvedStringOrError resolvedDefinition = ResolveAllReferences(definition);
     return resolvedDefinition;
   }
 

@@ -278,6 +278,52 @@ namespace InfraTest
     TEST_ASSERT(true == actualResolveResult.HasError());
   }
 
+  // Verifies that a custom domain definition referencing an unrecognized variable resolves
+  // successfully to the default value.
+  TEST_CASE(Resolver_SingleReference_CustomDomainDefinition_InvalidWithDefaultValue)
+  {
+    constexpr std::wstring_view kDefaultCustomDomainValue = L"Default value.";
+
+    Resolver resolver;
+    resolver.RegisterCustomDomain(
+        kStrReferenceDomainTesting, {{L"X", L"Value of X"}}, kDefaultCustomDomainValue);
+
+    const ResolvedStringViewOrError actualResolveResult = resolver.ResolveSingleReference(
+        std::wstring(kStrReferenceDomainTesting) + std::wstring(kStrDelimterReferenceDomainVsName) +
+        L"UnknownVariable123456");
+    TEST_ASSERT(true == actualResolveResult.HasValue());
+    TEST_ASSERT(actualResolveResult.Value() == kDefaultCustomDomainValue);
+  }
+
+  // Verifies that a custom domain definition referencing an unrecognized variable resolves
+  // successfully to the default value, where the default value contains an embedded reference.
+  TEST_CASE(Resolver_SingleReference_CustomDomainDefinition_InvalidWithDefaultValueWithReference)
+  {
+    Resolver resolver;
+    resolver.RegisterCustomDomain(
+        kStrReferenceDomainTesting, {{L"X", L"Value of X"}}, L"%BUILTIN::ExecutableBaseName%");
+
+    const ResolvedStringViewOrError actualResolveResult = resolver.ResolveSingleReference(
+        std::wstring(kStrReferenceDomainTesting) + std::wstring(kStrDelimterReferenceDomainVsName) +
+        L"UnknownVariable123456");
+    TEST_ASSERT(true == actualResolveResult.HasValue());
+    TEST_ASSERT(actualResolveResult.Value() == ProcessInfo::GetExecutableBaseName());
+  }
+
+  // Verifies that a custom domain definition referencing an unrecognized variable fails to resolve,
+  // where the default value contains an embedded circular reference.
+  TEST_CASE(Resolver_SingleReference_CustomDomainDefinition_InvalidWithDefaultValueWithCircularReference)
+  {
+    Resolver resolver;
+    resolver.RegisterCustomDomain(
+        kStrReferenceDomainTesting, {{L"X", L"Value of X"}}, L"%TESTING::Y%");
+
+    const ResolvedStringViewOrError actualResolveResult = resolver.ResolveSingleReference(
+        std::wstring(kStrReferenceDomainTesting) + std::wstring(kStrDelimterReferenceDomainVsName) +
+        L"UnknownVariable123456");
+    TEST_ASSERT(true == actualResolveResult.HasError());
+  }
+
   // Verifies that valid references to built-in strings are resolved correctly and without regard
   // for case.
   TEST_CASE(Resolver_SingleReference_Builtin_Nominal)

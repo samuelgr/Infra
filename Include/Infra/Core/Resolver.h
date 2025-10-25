@@ -12,6 +12,7 @@
 #pragma once
 
 #include <functional>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -71,9 +72,15 @@ namespace Infra
     /// @param [in] domain Name of the custom domain.
     /// @param [in] definitions Definitions of variables in the custom domain. These may include
     /// references to other variables in any domain.
+    /// @param [in] defaultValue If present, represents the default value that will be resolved for
+    /// the custom domain if a request is made for a value that is not present. May include other
+    /// references, as these will be resolved automatically.
     /// @return `true` if the domain was successfully registered (domain name is non-empty and not
     /// already registered), `false` otherwise.
-    bool RegisterCustomDomain(std::wstring_view domain, TDefinitions&& definitions);
+    bool RegisterCustomDomain(
+        std::wstring_view domain,
+        TDefinitions&& definitions,
+        std::optional<std::wstring_view> defaultValue = std::nullopt);
 
     /// Resolves a single reference represented by the input string. Input string is expected to
     /// be of the form [DOMAIN]::[REFERENCE_NAME]. Single reference resolution results are
@@ -120,9 +127,13 @@ namespace Infra
     /// Resolves a definition for a custom domain.
     /// @param [in] name Name of the custom domain variable to resolve.
     /// @param [in] definitions Definitions that correspond to the variables in the custom domain.
+    /// @param [in] defaultValue If present, will be used as a default value in the event that the
+    /// provided definitions do not contain a value for the requested name.
     /// @return Resolved value on success, error message on failure.
     ResolvedStringOrError ResolveCustomDomainVariable(
-        std::wstring_view name, const TDefinitions& definitions);
+        std::wstring_view name,
+        const TDefinitions& definitions,
+        std::optional<std::wstring_view> defaultValue);
 
     /// Container for holding reference resolutions that are currently in progress at any given
     /// time. Used for cycle detection.
