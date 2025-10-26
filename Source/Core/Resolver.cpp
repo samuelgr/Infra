@@ -316,7 +316,8 @@ namespace Infra
   }
 
   Resolver::Resolver(void)
-      : resolutionsInProgress(),
+      : customDomainDefinitions(),
+        resolutionsInProgress(),
         resolvedSingleReferenceCache(),
         resolversByDomain(
             {{kStrReferenceDomainBuiltin, &ResolveBuiltin},
@@ -326,19 +327,27 @@ namespace Infra
 
   bool Resolver::RegisterCustomDomain(
       std::wstring_view domain,
-      TDefinitions&& definitions,
+      const TDefinitions& definitions,
       std::optional<std::wstring_view> defaultValue)
   {
-    if (true == domain.empty()) return false;
     return resolversByDomain
         .emplace(
             domain,
-            [this, definitions = std::move(definitions), defaultValue](
-                std::wstring_view name) -> ResolvedStringOrError
+            [this, definitions, defaultValue](std::wstring_view name) -> ResolvedStringOrError
             {
               return ResolveCustomDomainVariable(name, definitions, defaultValue);
             })
         .second;
+  }
+
+  bool Resolver::RegisterCustomDomain(
+      std::wstring_view domain,
+      TDefinitions&& definitions,
+      std::optional<std::wstring_view> defaultValue)
+  {
+    if ((true == domain.empty()) || (true == resolversByDomain.contains(domain))) return false;
+    return RegisterCustomDomain(
+        domain, customDomainDefinitions.emplace_front(std::move(definitions)), defaultValue);
   }
 
   ResolvedStringOrError Resolver::ResolveCustomDomainVariable(

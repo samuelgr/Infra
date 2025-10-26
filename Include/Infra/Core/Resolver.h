@@ -11,6 +11,7 @@
 
 #pragma once
 
+#include <forward_list>
 #include <functional>
 #include <optional>
 #include <string>
@@ -68,7 +69,23 @@ namespace Infra
 
     Resolver(Resolver&& other) = delete;
 
-    /// Registers a custom domain in this resolver object.
+    /// Registers a custom domain in this resolver object. This version of the function does not
+    /// claim ownership over the definitions object.
+    /// @param [in] domain Name of the custom domain.
+    /// @param [in] definitions Definitions of variables in the custom domain. These may include
+    /// references to other variables in any domain.
+    /// @param [in] defaultValue If present, represents the default value that will be resolved for
+    /// the custom domain if a request is made for a value that is not present. May include other
+    /// references, as these will be resolved automatically.
+    /// @return `true` if the domain was successfully registered (domain name is non-empty and not
+    /// already registered), `false` otherwise.
+    bool RegisterCustomDomain(
+        std::wstring_view domain,
+        const TDefinitions& definitions,
+        std::optional<std::wstring_view> defaultValue = std::nullopt);
+
+    /// Registers a custom domain in this resolver object. This version of the function claims
+    /// ownership over the definitions object.
     /// @param [in] domain Name of the custom domain.
     /// @param [in] definitions Definitions of variables in the custom domain. These may include
     /// references to other variables in any domain.
@@ -134,6 +151,9 @@ namespace Infra
         std::wstring_view name,
         const TDefinitions& definitions,
         std::optional<std::wstring_view> defaultValue);
+
+    /// Container for holding all definitions used by custom domains.
+    std::forward_list<TDefinitions> customDomainDefinitions;
 
     /// Container for holding reference resolutions that are currently in progress at any given
     /// time. Used for cycle detection.

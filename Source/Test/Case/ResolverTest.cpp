@@ -280,7 +280,7 @@ namespace InfraTest
 
   // Verifies that a custom domain definition referencing an unrecognized variable resolves
   // successfully to the default value.
-  TEST_CASE(Resolver_SingleReference_CustomDomainDefinition_InvalidWithDefaultValue)
+  TEST_CASE(Resolver_SingleReference_CustomDomainDefinition_WithDefaultValue)
   {
     constexpr std::wstring_view kDefaultCustomDomainValue = L"Default value.";
 
@@ -297,7 +297,7 @@ namespace InfraTest
 
   // Verifies that a custom domain definition referencing an unrecognized variable resolves
   // successfully to the default value, where the default value contains an embedded reference.
-  TEST_CASE(Resolver_SingleReference_CustomDomainDefinition_InvalidWithDefaultValueWithReference)
+  TEST_CASE(Resolver_SingleReference_CustomDomainDefinition_WithDefaultValueWithReference)
   {
     Resolver resolver;
     resolver.RegisterCustomDomain(
@@ -312,7 +312,8 @@ namespace InfraTest
 
   // Verifies that a custom domain definition referencing an unrecognized variable fails to resolve,
   // where the default value contains an embedded circular reference.
-  TEST_CASE(Resolver_SingleReference_CustomDomainDefinition_InvalidWithDefaultValueWithCircularReference)
+  TEST_CASE(
+      Resolver_SingleReference_CustomDomainDefinition_InvalidWithDefaultValueWithCircularReference)
   {
     Resolver resolver;
     resolver.RegisterCustomDomain(
@@ -322,6 +323,27 @@ namespace InfraTest
         std::wstring(kStrReferenceDomainTesting) + std::wstring(kStrDelimterReferenceDomainVsName) +
         L"UnknownVariable123456");
     TEST_ASSERT(true == actualResolveResult.HasError());
+  }
+
+  // Verifies that two custom domain definitions that share an underlying definitions object both
+  // operate correctly.
+  TEST_CASE(Resolver_SingleReference_CustomDomainDefinition_SharedDefinitions)
+  {
+    const Resolver::TDefinitions definitions = {{L"X", L"Value of X"}};
+
+    Resolver resolver;
+    TEST_ASSERT(true == resolver.RegisterCustomDomain(L"TEST1", definitions));
+    TEST_ASSERT(true == resolver.RegisterCustomDomain(L"TEST2", definitions));
+
+    const ResolvedStringViewOrError actualResolveResult1 =
+        resolver.ResolveSingleReference(L"TEST1::X");
+    TEST_ASSERT(true == actualResolveResult1.HasValue());
+    TEST_ASSERT(actualResolveResult1.Value() == L"Value of X");
+
+    const ResolvedStringViewOrError actualResolveResult2 =
+        resolver.ResolveSingleReference(L"TEST2::X");
+    TEST_ASSERT(true == actualResolveResult2.HasValue());
+    TEST_ASSERT(actualResolveResult2.Value() == L"Value of X");
   }
 
   // Verifies that valid references to built-in strings are resolved correctly and without regard
