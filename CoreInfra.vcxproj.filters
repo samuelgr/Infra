@@ -39,6 +39,9 @@
     <ClCompile Include="Source\Core\Resolver.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Source\Core\WindowsUtilities.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Include\Infra\Core\ArrayList.h">
@@ -78,6 +81,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Include\Infra\Core\Resolver.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Include\Infra\Core\WindowsUtilities.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

@@ -26,6 +26,7 @@
     <ClCompile Include="Source\Core\Strings.cpp" />
     <ClCompile Include="Source\Core\SystemInfo.cpp" />
     <ClCompile Include="Source\Core\TemporaryBuffer.cpp" />
+    <ClCompile Include="Source\Core\WindowsUtilities.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Include\Infra\Core\ArrayList.h" />
@@ -40,6 +41,7 @@
     <ClInclude Include="Include\Infra\Core\SystemInfo.h" />
     <ClInclude Include="Include\Infra\Core\TemporaryBuffer.h" />
     <ClInclude Include="Include\Infra\Core\ValueOrError.h" />
+    <ClInclude Include="Include\Infra\Core\WindowsUtilities.h" />
     <ClInclude Include="Include\Infra\Internal\ApiWindows.h" />
   </ItemGroup>
   <ItemGroup>
