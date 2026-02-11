@@ -3,7 +3,7 @@
 ;   Common infrastructure used by other projects.
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; Authored by Samuel Grossman
-; Copyright (c) 2016-2025
+; Copyright (c) 2016-2026
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; Registers.inc
 ;   Size-dependent name mappings for registers. Helps with 32/64-bit portability.

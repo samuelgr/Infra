@@ -3,7 +3,7 @@
  *   Common infrastructure used by other projects.
  ***************************************************************************************************
  * Authored by Samuel Grossman
- * Copyright (c) 2016-2025
+ * Copyright (c) 2016-2026
  ***********************************************************************************************//**
  * @file ValueOrError.h
  *   Variant type that holds either a value or an error of some kind.

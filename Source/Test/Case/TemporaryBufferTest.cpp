@@ -3,7 +3,7 @@
  *   Common infrastructure used by other projects.
  ***************************************************************************************************
  * Authored by Samuel Grossman
- * Copyright (c) 2016-2025
+ * Copyright (c) 2016-2026
  ***********************************************************************************************//**
  * @file TemporaryBufferTest.cpp
  *   Unit tests for temporary buffer management functionality, including associated data

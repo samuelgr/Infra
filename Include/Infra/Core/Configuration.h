@@ -3,7 +3,7 @@
  *   Common infrastructure used by other projects.
  ***************************************************************************************************
  * Authored by Samuel Grossman
- * Copyright (c) 2016-2025
+ * Copyright (c) 2016-2026
  ***********************************************************************************************//**
  * @file Configuration.h
  *   Declaration of configuration file functionality.

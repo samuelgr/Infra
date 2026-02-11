@@ -3,7 +3,7 @@
 ;   Common infrastructure used by other projects.
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; Authored by Samuel Grossman
-; Copyright (c) 2016-2025
+; Copyright (c) 2016-2026
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; Preamble.inc
 ;   Definitions that should appear at the start of a portable assembly file. Helps with
