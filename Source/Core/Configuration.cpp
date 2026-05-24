@@ -517,6 +517,9 @@ namespace Infra
         case L')':
         case L'*':
         case L'?':
+        case L'©':
+        case L'®':
+        case L'™':
           return true;
 
         default:
