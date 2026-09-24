@@ -273,13 +273,10 @@ if "yes"=="%files_are_missing%" (
 if yes==%digitally_sign_binaries% (
     pushd %output_dir%
 
-    set signtool_flags=/fdchw /tdchw /f "%CODE_SIGN_CERTIFICATE_PFX_FILE%" /fd "%CODE_SIGN_DIGEST_ALGORITHM%"
+    set signtool_flags=/sha1 %CODE_SIGN_CERTIFICATE_SHA1_THUMBPRINT% /fdchw /fd certHash
     set uses_timestamp_countersignature=no
-    if not "%CODE_SIGN_CERTIFICATE_PFX_PASSWORD%"=="" (
-        set signtool_flags=!signtool_flags! /p %CODE_SIGN_CERTIFICATE_PFX_PASSWORD%
-    )
     if not "%CODE_SIGN_TIMESTAMP_SERVER%"=="" (
-        set signtool_flags=!signtool_flags! /tr "%CODE_SIGN_TIMESTAMP_SERVER%" /td "%CODE_SIGN_DIGEST_ALGORITHM%"
+        set signtool_flags=!signtool_flags! /tr "%CODE_SIGN_TIMESTAMP_SERVER%" /tdchw /td SHA256
         set uses_timestamp_countersignature=yes
     )
 
@@ -315,24 +312,21 @@ if yes==%digitally_sign_binaries% (
             )
         )
 
-        set signed_a_file=no
+        set signtool_files=
         for %%B in (!sign_search_paths!) do (
-            set signed_a_file=yes
-
-            signtool sign !signtool_flags! %%B >%%B.signtool.log.txt 2>&1
-            if !ERRORLEVEL!==0 (
-                del %%B.signtool.log.txt >NUL 2>NUL
-                echo     %%B
-
-                if "yes"=="!uses_timestamp_countersignature!" (
-                    timeout /t 15 /nobreak >NUL 2>NUL
-                )
-            ) else (
-                echo     %%B ^(failed^)
-            )
+            set signtool_files=!signtool_files! "%%B"
+            echo     %%B
         )
 
-        if "no"=="!signed_a_file!" (
+        if not ""=="!signtool_files!" (
+            signtool sign !signtool_flags! !signtool_files! >signtool.log.txt 2>&1
+            if !ERRORLEVEL!==0 (
+                del signtool.log.txt >NUL 2>NUL
+            ) else (
+                echo Failed to digitally sign files.
+                echo Check the log file in the output directory for details.
+            )
+        ) else (
             echo     ^(none^)
         )
     ) else (
